@@ -133,7 +133,6 @@ public sealed class PresetService
             "--filter-tcp=80,443-65535",
             "{IPSET_EXCLUDE:ru}",
             "--out-range=-d7",
-            "--lua-desync=fake:blob=tls_google:repeats=6:tcp_ts=-600000",
             "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=stun_pat:repeats=2",
             "--lua-desync=tls_multisplit_sni:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20",

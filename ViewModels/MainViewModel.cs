@@ -432,21 +432,30 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             UpdateStatus = "Проверка обновлений…";
+            AppendLog("Проверка обновлений…");
+
+            // --- 1. Check engine update (bol-van/zapret2) ---
             ReleaseInfo latest;
             try
             {
                 latest = await _updater.FetchLatestAsync();
+                AppendLog($"Движок GitHub: {latest.Tag}");
             }
             catch (Exception ex)
             {
-                UpdateStatus = _updater.IsEngineInstalled
-                    ? $"Не удалось проверить обновления ({ex.Message}). Работаем на установленной версии."
+                string msg = _updater.IsEngineInstalled
+                    ? $"Не удалось проверить обновления движка ({ex.Message}). Работаем на установленной версии."
                     : $"Нет связи с GitHub: {ex.Message}";
+                UpdateStatus = msg;
+                AppendLog(msg);
+                if (!silent)
+                    MessageBox.Show(msg, "Обновление движка", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (!_updater.IsEngineInstalled || !_updater.IsEngineComplete || _updater.IsUpdateAvailable(latest))
             {
+                AppendLog($"Доступно обновление движка: {latest.Tag}. Загрузка…");
                 bool wasRunning = IsRunning;
                 if (wasRunning)
                 {
@@ -459,6 +468,7 @@ public sealed class MainViewModel : ObservableObject
                 {
                     UpdateProgress = p.Fraction;
                     UpdateStatus = p.Message;
+                    AppendLog(p.Message);
                 });
                 try
                 {
@@ -468,10 +478,13 @@ public sealed class MainViewModel : ObservableObject
                 {
                     UpdateStatus = $"Не удалось установить движок: {ex.Message}";
                     AppendLog("Ошибка загрузки движка: " + ex.Message);
+                    if (!silent)
+                        MessageBox.Show($"Ошибка загрузки движка: {ex.Message}", "Обновление", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
                 EngineVersion = _updater.InstalledVersion ?? "—";
                 UpdateStatus = $"Движок обновлён: {latest.Tag}";
+                AppendLog($"Движок обновлён: {latest.Tag}");
                 OnPropertyChanged(nameof(CanStart));
                 RaiseCommandStates();
 
@@ -479,8 +492,31 @@ public sealed class MainViewModel : ObservableObject
             }
             else
             {
-                UpdateStatus = $"Актуальная версия: {latest.Tag}";
+                UpdateStatus = $"Актуальная версия движка: {latest.Tag}";
+                AppendLog($"Движок актуален: {latest.Tag}");
             }
+
+            // --- 2. Check app update (kayucm21/Zanpet) ---
+            try
+            {
+                var appLatest = await _updater.FetchAppLatestAsync();
+                if (appLatest is { } appInfo && UpdaterService.IsAppUpdate(appInfo.Tag))
+                {
+                    string appMsg = $"Доступно обновление приложения: {appInfo.Tag}";
+                    UpdateStatus = appMsg;
+                    AppendLog(appMsg);
+                    if (!silent)
+                    {
+                        var result = MessageBox.Show(
+                            $"Доступна новая версия приложения: {appInfo.Tag}\n\nОткрыть страницу загрузки?",
+                            "Обновление приложения",
+                            MessageBoxButton.YesNo, MessageBoxImage.Information);
+                        if (result == MessageBoxResult.Yes)
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(appInfo.Url) { UseShellExecute = true });
+                    }
+                }
+            }
+            catch { /* app update check is non-critical */ }
         }
         finally
         {

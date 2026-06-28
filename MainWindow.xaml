@@ -264,10 +264,9 @@
                                                 <DataTrigger.EnterActions>
                                                     <BeginStoryboard Name="GlowOn">
                                                         <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetProperty="(Effect).(DropShadowEffect.BlurRadius)"
-                                                                             To="24" Duration="0:0:0.6" AutoReverse="True" RepeatBehavior="Forever"/>
-                                                            <DoubleAnimation Storyboard.TargetProperty="(Effect).(DropShadowEffect.Opacity)"
-                                                                             To="0.6" Duration="0:0:0.6" AutoReverse="True" RepeatBehavior="Forever"/>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="1" To="0.78" Duration="0:0:1.2"
+                                                                             AutoReverse="True" RepeatBehavior="Forever"/>
                                                         </Storyboard>
                                                     </BeginStoryboard>
                                                 </DataTrigger.EnterActions>
@@ -514,6 +513,8 @@
                                         <Button Content="Проверить обновления" Command="{Binding CheckUpdateCommand}"
                                                 Style="{StaticResource GhostButton}" Margin="16,0,0,0"/>
                                     </StackPanel>
+                                    <TextBlock Text="{Binding UpdateStatus}" Style="{StaticResource Muted}" FontSize="11.5"
+                                               TextWrapping="Wrap" Margin="0,0,0,4"/>
                                 </StackPanel>
                             </Border>
 
