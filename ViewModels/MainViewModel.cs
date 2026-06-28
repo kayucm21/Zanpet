@@ -78,7 +78,20 @@ public sealed class MainViewModel : ObservableObject
     {
         try
         {
-            VpnXrayStatus = _vpn.IsXrayInstalled ? "Установлен" : "Не установлен";
+            if (!_vpn.IsXrayInstalled)
+            {
+                VpnXrayStatus = "Скачивание xray-core…";
+                AppendLog("VPN: xray-core не найден, скачиваю…");
+                await _vpn.DownloadXrayAsync();
+                VpnXrayStatus = "Установлен";
+                OnPropertyChanged(nameof(VpnXrayShowDownload));
+                AppendLog("VPN: xray-core установлен.");
+            }
+            else
+            {
+                VpnXrayStatus = "Установлен";
+            }
+
             var servers = _vpn.LoadCachedSubscription();
             if (servers.Count == 0)
             {
@@ -89,7 +102,11 @@ public sealed class MainViewModel : ObservableObject
             if (servers.Count > 0)
                 VpnStatus = $"Загружено {servers.Count} серверов. Нажмите «Подключить».";
         }
-        catch { }
+        catch (Exception ex)
+        {
+            VpnXrayStatus = $"Ошибка: {ex.Message}";
+            AppendLog($"VPN ошибка: {ex.Message}");
+        }
     }
 
     // ---- collections -------------------------------------------------------

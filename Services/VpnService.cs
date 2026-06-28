@@ -16,7 +16,7 @@ namespace ZapretUI.Services;
 public sealed class VpnService : IDisposable
 {
     private Process? _proc;
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(30) };
+    private readonly HttpClient _http;
 
     public bool IsConnected => _proc is { HasExited: false };
 
@@ -31,6 +31,13 @@ public sealed class VpnService : IDisposable
 
     private const string XrayReleaseApi = "https://api.github.com/repos/XTLS/Xray-core/releases/latest";
     public const string VpnSubscriptionUrl = "https://tepaqq.mooo.com/s/V9UygbKuEvfjSy0KYPIgH3sLSQbXo6l-6_LCrTAjwrm208Cy/VPN/b64";
+
+    public VpnService()
+    {
+        _http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+        _http.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("ZapretUI", "2.1"));
+        _http.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+    }
 
     // ---- subscription parsing ----
 
