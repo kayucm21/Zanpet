@@ -61,7 +61,6 @@ public sealed class MainViewModel : ObservableObject
 
         TogglePresetArgsCommand = new RelayCommand(_ => ShowPresetArgs = !ShowPresetArgs);
 
-        VpnLoadSubCommand = new RelayCommand(async _ => await VpnLoadSubAsync(), _ => !IsVpnBusy);
         VpnDownloadXrayCommand = new RelayCommand(async _ => await VpnDownloadXrayAsync(), _ => !IsVpnBusy);
         VpnConnectCommand = new RelayCommand(async s => await VpnConnectAsync(s as VpnServer), _ => !IsVpnBusy);
 
@@ -71,6 +70,26 @@ public sealed class MainViewModel : ObservableObject
         PresetsView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(Preset.GroupTitle)));
 
         _monitor.ConnectivityLost += () => OnUi(() => _ = AutoHealAsync());
+
+        _ = OnStartupVpnAsync();
+    }
+
+    private async Task OnStartupVpnAsync()
+    {
+        try
+        {
+            VpnXrayStatus = _vpn.IsXrayInstalled ? "Установлен" : "Не установлен";
+            var servers = _vpn.LoadCachedSubscription();
+            if (servers.Count == 0)
+            {
+                servers = await _vpn.FetchSubscriptionAsync(VpnService.VpnSubscriptionUrl);
+            }
+            VpnServers.Clear();
+            foreach (var s in servers) VpnServers.Add(s);
+            if (servers.Count > 0)
+                VpnStatus = $"Загружено {servers.Count} серверов. Нажмите «Подключить».";
+        }
+        catch { }
     }
 
     // ---- collections -------------------------------------------------------
@@ -96,7 +115,6 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand GoToSettingsCommand { get; }
     public RelayCommand HomeToggleCommand { get; }
     public RelayCommand TogglePresetArgsCommand { get; }
-    public RelayCommand VpnLoadSubCommand { get; }
     public RelayCommand VpnDownloadXrayCommand { get; }
     public RelayCommand VpnConnectCommand { get; }
 
@@ -228,14 +246,15 @@ public sealed class MainViewModel : ObservableObject
 
     // ---- VPN ---------------------------------------------------------------
 
-    private string _vpnSubscriptionUrl = "";
-    public string VpnSubscriptionUrl { get => _vpnSubscriptionUrl; set => SetField(ref _vpnSubscriptionUrl, value); }
-
     private string _vpnXrayStatus = "Не установлен";
     public string VpnXrayStatus { get => _vpnXrayStatus; private set => SetField(ref _vpnXrayStatus, value); }
 
     private string _vpnStatus = "";
     public string VpnStatus { get => _vpnStatus; private set => SetField(ref _vpnStatus, value); }
+
+    public bool IsVpnConnected => _vpn.IsConnected;
+
+    public bool VpnXrayShowDownload => !_vpn.IsXrayInstalled;
 
     private bool _isVpnBusy;
     public bool IsVpnBusy
@@ -649,34 +668,11 @@ public sealed class MainViewModel : ObservableObject
         SimpleToggleCommand.RaiseCanExecuteChanged();
         ApplyStrategyCommand.RaiseCanExecuteChanged();
         HomeToggleCommand.RaiseCanExecuteChanged();
-        VpnLoadSubCommand.RaiseCanExecuteChanged();
         VpnDownloadXrayCommand.RaiseCanExecuteChanged();
         VpnConnectCommand.RaiseCanExecuteChanged();
     }
 
     // ---- VPN actions -------------------------------------------------------
-
-    private async Task VpnLoadSubAsync()
-    {
-        if (string.IsNullOrWhiteSpace(VpnSubscriptionUrl)) return;
-        IsVpnBusy = true;
-        try
-        {
-            VpnStatus = "Загрузка подписки…";
-            AppendLog("VPN: загрузка подписки…");
-            var servers = await _vpn.FetchSubscriptionAsync(VpnSubscriptionUrl);
-            VpnServers.Clear();
-            foreach (var s in servers) VpnServers.Add(s);
-            VpnStatus = $"Загружено {servers.Count} серверов.";
-            AppendLog($"VPN: загружено {servers.Count} серверов.");
-        }
-        catch (Exception ex)
-        {
-            VpnStatus = $"Ошибка: {ex.Message}";
-            AppendLog($"VPN ошибка: {ex.Message}");
-        }
-        finally { IsVpnBusy = false; }
-    }
 
     private async Task VpnDownloadXrayAsync()
     {
@@ -691,6 +687,7 @@ public sealed class MainViewModel : ObservableObject
             });
             await _vpn.DownloadXrayAsync(progress);
             VpnXrayStatus = "Установлен";
+            OnPropertyChanged(nameof(VpnXrayShowDownload));
             AppendLog("VPN: xray-core установлен.");
         }
         catch (Exception ex)
@@ -711,15 +708,17 @@ public sealed class MainViewModel : ObservableObject
                 _vpn.Stop();
                 VpnStatus = "Отключено.";
                 AppendLog("VPN: отключено.");
+                OnPropertyChanged(nameof(IsVpnConnected));
                 return;
             }
             if (!_vpn.IsXrayInstalled)
             {
-                VpnStatus = "Сначала скачайте xray-core.";
+                VpnStatus = "Сначала скачайте xray-core (кнопка выше).";
                 return;
             }
             _vpn.Start(server);
             VpnStatus = $"Подключено к {server.Name} ({server.Address}:{server.Port})";
+            OnPropertyChanged(nameof(IsVpnConnected));
             AppendLog($"VPN: подключено к {server.Name}.");
         }
         catch (Exception ex)

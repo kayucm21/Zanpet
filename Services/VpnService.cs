@@ -30,6 +30,7 @@ public sealed class VpnService : IDisposable
     private static string SubCachePath => Path.Combine(AppPaths.Root, "vpn_subscription.txt");
 
     private const string XrayReleaseApi = "https://api.github.com/repos/XTLS/Xray-core/releases/latest";
+    public const string VpnSubscriptionUrl = "https://tepaqq.mooo.com/s/V9UygbKuEvfjSy0KYPIgH3sLSQbXo6l-6_LCrTAjwrm208Cy/VPN/b64";
 
     // ---- subscription parsing ----
 

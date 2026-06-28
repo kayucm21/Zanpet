@@ -577,45 +577,28 @@
 
                             <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                                 <StackPanel>
-                                    <TextBlock Text="Подписка" Style="{StaticResource H2}" Margin="0,0,0,8"/>
-                                    <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,10"
-                                               Text="Вставьте URL подписки (base64 VLESS). Нажмите «Загрузить» для получения списка серверов."/>
-                                    <Grid Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Grid.Column="0" Text="{Binding VpnSubscriptionUrl, Mode=TwoWay}"
-                                                 Padding="10,8" VerticalAlignment="Center"/>
-                                        <Button Grid.Column="1" Content="Загрузить"
-                                                Command="{Binding VpnLoadSubCommand}"
-                                                Style="{StaticResource PrimaryButton}" Margin="10,0,0,0"/>
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-
-                            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
-                                <StackPanel>
-                                    <TextBlock Text="Xray-core" Style="{StaticResource H2}" Margin="0,0,0,8"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Style="{StaticResource Muted}"
-                                                   Text="{Binding VpnXrayStatus}" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Style="{StaticResource Muted}" FontSize="12"
+                                                       Text="{Binding VpnXrayStatus}"/>
+                                        </StackPanel>
                                         <Button Grid.Column="1" Content="Скачать xray"
                                                 Command="{Binding VpnDownloadXrayCommand}"
-                                                Style="{StaticResource GhostButton}" Margin="10,0,0,0"/>
+                                                Style="{StaticResource GhostButton}" Margin="10,0,0,0"
+                                                Visibility="{Binding VpnXrayShowDownload, Converter={StaticResource BoolToVis}}"/>
                                     </Grid>
                                 </StackPanel>
                             </Border>
 
-                            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                            <Border Style="{StaticResource Card}">
                                 <StackPanel>
-                                    <TextBlock Text="Серверы" Style="{StaticResource H2}" Margin="0,0,0,8"/>
-                                    <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,10"
-                                               Text="Выберите сервер и нажмите «Подключить»."/>
+                                    <TextBlock Text="Доступные серверы" Style="{StaticResource H2}" Margin="0,0,0,8"/>
+                                    <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,0,0,10"
+                                               Text="{Binding VpnStatus}"/>
                                     <ItemsControl ItemsSource="{Binding VpnServers}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -639,18 +622,28 @@
                                                                 <Run Text="{Binding Port, Mode=OneWay}"/>
                                                             </TextBlock>
                                                         </StackPanel>
-                                                        <Button Grid.Column="1" Content="Подключить"
+                                                        <Button Grid.Column="1"
                                                                 Command="{Binding DataContext.VpnConnectCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                 CommandParameter="{Binding}"
-                                                                Style="{StaticResource PrimaryButton}" Padding="14,7"
-                                                                FontSize="12"/>
+                                                                Padding="14,7"
+                                                                FontSize="12">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                                                                    <Setter Property="Content" Value="Подключить"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding DataContext.IsVpnConnected, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                                            <Setter Property="Content" Value="Отключить"/>
+                                                                            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                        </Button>
                                                     </Grid>
                                                 </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-                                    <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0"
-                                               Text="{Binding VpnStatus}"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
