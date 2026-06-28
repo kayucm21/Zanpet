@@ -326,7 +326,6 @@ public sealed class VpnService : IDisposable
             if (!_proc.HasExited)
             {
                 _proc.Kill(entireProcessTree: true);
-                _proc.WaitForExit(3000);
             }
         }
         catch { }
