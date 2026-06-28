@@ -7,3 +7,4 @@ publish_final/
 .vs/
 *.nupkg
 *.snupkg
+*.zip
