@@ -511,9 +511,6 @@
                             CornerRadius="10" Padding="{TemplateBinding Padding}"
                             RenderTransformOrigin="0.5,0.5">
                         <Border.RenderTransform><ScaleTransform x:Name="bs" ScaleX="1" ScaleY="1"/></Border.RenderTransform>
-                        <Border.Effect>
-                            <DropShadowEffect x:Name="glow" BlurRadius="0" ShadowDepth="0" Opacity="0" Color="#34D399"/>
-                        </Border.Effect>
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
