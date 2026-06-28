@@ -21,9 +21,9 @@
     <Color x:Key="C.Fg">#FFEDF1F8</Color>
     <Color x:Key="C.FgMuted">#FF92A0B3</Color>
     <Color x:Key="C.Muted2">#FF5B6675</Color>
-    <Color x:Key="C.Accent">#FFA78BFA</Color>
-    <Color x:Key="C.AccentHover">#FF6D4BD8</Color>
-    <Color x:Key="C.AccentSoft">#24A78BFA</Color>
+    <Color x:Key="C.Accent">#FF60A5FA</Color>
+    <Color x:Key="C.AccentHover">#FF3B82F6</Color>
+    <Color x:Key="C.AccentSoft">#2060A5FA</Color>
 
     <SolidColorBrush x:Key="BgBrush"        Color="{StaticResource C.Bg}"/>
     <SolidColorBrush x:Key="SurfaceBrush"   Color="{StaticResource C.Surface}"/>
@@ -495,7 +495,7 @@
         </Setter>
     </Style>
 
-    <!-- Big start/stop button with colour states -->
+    <!-- Big start/stop button with colour states + glow -->
     <Style x:Key="StartStopButton" TargetType="Button">
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
@@ -511,6 +511,9 @@
                             CornerRadius="10" Padding="{TemplateBinding Padding}"
                             RenderTransformOrigin="0.5,0.5">
                         <Border.RenderTransform><ScaleTransform x:Name="bs" ScaleX="1" ScaleY="1"/></Border.RenderTransform>
+                        <Border.Effect>
+                            <DropShadowEffect x:Name="glow" BlurRadius="0" ShadowDepth="0" Opacity="0" Color="#34D399"/>
+                        </Border.Effect>
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>

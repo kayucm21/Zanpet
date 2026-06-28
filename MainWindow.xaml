@@ -114,6 +114,10 @@
                             Padding="7,2" Margin="10,0,0,0" VerticalAlignment="Center">
                         <TextBlock Text="DPI bypass" FontSize="11" Foreground="{StaticResource FgMutedBrush}"/>
                     </Border>
+                    <Border CornerRadius="6" Background="{StaticResource AccentSoftBrush}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                            Padding="7,2" Margin="6,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="v2.0.0" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
+                    </Border>
                 </StackPanel>
 
                 <Border HorizontalAlignment="Center" VerticalAlignment="Center" CornerRadius="8"
@@ -257,6 +261,19 @@
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsRunning}" Value="True">
                                                 <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard Name="GlowOn">
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="(Effect).(DropShadowEffect.BlurRadius)"
+                                                                             To="24" Duration="0:0:0.6" AutoReverse="True" RepeatBehavior="Forever"/>
+                                                            <DoubleAnimation Storyboard.TargetProperty="(Effect).(DropShadowEffect.Opacity)"
+                                                                             To="0.6" Duration="0:0:0.6" AutoReverse="True" RepeatBehavior="Forever"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="GlowOn"/>
+                                                </DataTrigger.ExitActions>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
