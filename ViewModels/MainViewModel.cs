@@ -81,26 +81,36 @@ public sealed class MainViewModel : ObservableObject
             if (!_vpn.IsXrayInstalled)
             {
                 VpnXrayStatus = "Скачивание xray-core…";
-                AppendLog("VPN: xray-core не найден, скачиваю…");
-                await _vpn.DownloadXrayAsync();
-                VpnXrayStatus = "Установлен";
+                AppendLog("VPN: xray-core не найден, скачиваю автоматически…");
+                var progress = new Progress<double>(p =>
+                {
+                    VpnXrayStatus = $"Скачивание xray-core… {p:P0}";
+                });
+                await _vpn.DownloadXrayAsync(progress);
+                VpnXrayStatus = _vpn.IsXrayInstalled ? "Установлен" : "Ошибка установки";
                 OnPropertyChanged(nameof(VpnXrayShowDownload));
-                AppendLog("VPN: xray-core установлен.");
+                AppendLog(_vpn.IsXrayInstalled
+                    ? "VPN: xray-core установлен."
+                    : "VPN: xray-core НЕ найден после скачивания.");
             }
             else
             {
                 VpnXrayStatus = "Установлен";
+                AppendLog("VPN: xray-core уже установлен.");
             }
 
             var servers = _vpn.LoadCachedSubscription();
             if (servers.Count == 0)
             {
+                AppendLog("VPN: загрузка подписки…");
                 servers = await _vpn.FetchSubscriptionAsync(VpnService.VpnSubscriptionUrl);
             }
             VpnServers.Clear();
             foreach (var s in servers) VpnServers.Add(s);
-            if (servers.Count > 0)
-                VpnStatus = $"Загружено {servers.Count} серверов. Нажмите «Подключить».";
+            VpnStatus = servers.Count > 0
+                ? $"Загружено {servers.Count} серверов."
+                : "Нет серверов.";
+            AppendLog($"VPN: {servers.Count} серверов загружено.");
         }
         catch (Exception ex)
         {
@@ -724,23 +734,33 @@ public sealed class MainViewModel : ObservableObject
             {
                 _vpn.Stop();
                 VpnStatus = "Отключено.";
-                AppendLog("VPN: отключено.");
                 OnPropertyChanged(nameof(IsVpnConnected));
+                AppendLog("VPN: отключено.");
                 return;
             }
+
             if (!_vpn.IsXrayInstalled)
             {
-                VpnStatus = "Сначала скачайте xray-core (кнопка выше).";
-                return;
+                VpnXrayStatus = "Скачивание xray-core…";
+                AppendLog("VPN: xray не найден, скачиваю…");
+                await _vpn.DownloadXrayAsync();
+                VpnXrayStatus = _vpn.IsXrayInstalled ? "Установлен" : "Ошибка";
+                OnPropertyChanged(nameof(VpnXrayShowDownload));
+                if (!_vpn.IsXrayInstalled)
+                {
+                    VpnStatus = "Не удалось установить xray-core.";
+                    return;
+                }
             }
+
             _vpn.Start(server);
-            VpnStatus = $"Подключено к {server.Name} ({server.Address}:{server.Port})";
+            VpnStatus = $"Подключено к {server.Name}";
             OnPropertyChanged(nameof(IsVpnConnected));
-            AppendLog($"VPN: подключено к {server.Name}.");
+            AppendLog($"VPN: подключено к {server.Name} ({server.Address}:{server.Port}).");
         }
         catch (Exception ex)
         {
-            VpnStatus = $"Ошибка подключения: {ex.Message}";
+            VpnStatus = $"Ошибка: {ex.Message}";
             AppendLog($"VPN ошибка: {ex.Message}");
         }
     }

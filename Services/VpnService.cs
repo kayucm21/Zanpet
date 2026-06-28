@@ -166,18 +166,20 @@ public sealed class VpnService : IDisposable
 
         using (var zip = ZipFile.OpenRead(zipPath))
         {
-            string topFolder = zip.Entries.First().FullName.Split('/')[0] + "/";
             foreach (var entry in zip.Entries)
             {
-                if (entry.FullName.Length <= topFolder.Length) continue;
-                string rel = entry.FullName[topFolder.Length..];
-                if (rel.Length == 0 || rel.Contains('/')) continue;
-                string dest = Path.Combine(XrayDir, rel);
+                if (entry.FullName.EndsWith('/')) continue;
+                string name = entry.Name;
+                if (string.IsNullOrEmpty(name)) continue;
+                string dest = Path.Combine(XrayDir, name);
                 entry.ExtractToFile(dest, overwrite: true);
             }
         }
 
         try { File.Delete(zipPath); } catch { }
+
+        if (!File.Exists(XrayExe))
+            throw new FileNotFoundException($"xray.exe не найден в {XrayDir} после распаковки.");
     }
 
     // ---- xray config generation ----
