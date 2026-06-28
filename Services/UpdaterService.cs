@@ -22,9 +22,9 @@ public sealed class UpdaterService
 
     /// <summary>This UI app's own releases (separate from the engine).</summary>
     private const string AppReleasesLatestApi =
-        "https://api.github.com/repos/Asterlike/zapret2UI/releases/latest";
+        "https://api.github.com/repos/kayucm21/Zanpet/releases/latest";
     private const string AppReleasesPage =
-        "https://github.com/Asterlike/zapret2UI/releases/latest";
+        "https://github.com/kayucm21/Zanpet/releases/latest";
 
     private readonly HttpClient _http;
 
