@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>ZapretUI</AssemblyName>
+    <RootNamespace>ZapretUI</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <Version>0.6.2</Version>
+    <Product>Zapret UI</Product>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <!-- Self-contained single-file publish so the user needs nothing installed -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableComHosting>false</EnableComHosting>
+    <!-- WPF handles DPI via app.manifest; silence the WinForms-only DPI analyzer -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WinForms is only used for the tray NotifyIcon; avoid the global using
+         so System.Windows.Application (WPF) is not ambiguous everywhere. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Color-emoji rendering for WPF (WPF can't draw color emoji natively).
+         Provides emoji:TextBlock / emoji:RichTextBox with the bundled Twemoji font. -->
+    <PackageReference Include="Emoji.Wpf" Version="0.3.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
+    <Resource Include="Assets\app-on.ico" />
+    <Resource Include="Assets\donate-qr.png" />
+    <!-- Bundled OFL fonts (Hanken Grotesk / Space Grotesk / JetBrains Mono) so the
+         redesigned UI renders identically without the user installing anything. -->
+    <Resource Include="Assets\Fonts\*.ttf" />
+  </ItemGroup>
+
+  <!-- Bundle classic presets + data alongside the publish output.
+       MSBuild's PublishSingleFile pipeline strips .exe/.dll/.sys from Content,
+       so we copy engine binaries via a post-publish target. -->
+  <ItemGroup>
+    <Content Include="ClassicData\**\*" CopyToPublishDirectory="Always" Link="ClassicData\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- Copy engine binaries after publish (PublishSingleFile strips them from Content) -->
+  <Target Name="CopyEngineBinaries" AfterTargets="Publish">
+    <ItemGroup>
+      <_EngineBinaries Include="ClassicData\exe\*.exe;ClassicData\exe\*.dll;ClassicData\exe\*.sys" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_EngineBinaries)"
+          DestinationFiles="@(_EngineBinaries->'$(PublishDir)ClassicData\exe\%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
