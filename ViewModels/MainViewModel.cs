@@ -279,6 +279,9 @@ public sealed class MainViewModel : ObservableObject
     private string _vpnStatus = "";
     public string VpnStatus { get => _vpnStatus; private set => SetField(ref _vpnStatus, value); }
 
+    private string _vpnConnectedServerName = "";
+    public string VpnConnectedServerName { get => _vpnConnectedServerName; private set => SetField(ref _vpnConnectedServerName, value); }
+
     public bool IsVpnConnected => _vpn.IsConnected;
 
     public bool VpnXrayShowDownload => !_vpn.IsXrayInstalled;
@@ -733,8 +736,10 @@ public sealed class MainViewModel : ObservableObject
             if (_vpn.IsConnected)
             {
                 _vpn.Stop();
+                VpnConnectedServerName = "";
                 VpnStatus = "Отключено.";
                 OnPropertyChanged(nameof(IsVpnConnected));
+                OnPropertyChanged(nameof(VpnConnectedServerName));
                 AppendLog("VPN: отключено.");
                 return;
             }
@@ -754,8 +759,10 @@ public sealed class MainViewModel : ObservableObject
             }
 
             _vpn.Start(server);
+            VpnConnectedServerName = server.Name;
             VpnStatus = $"Подключено к {server.Name}";
             OnPropertyChanged(nameof(IsVpnConnected));
+            OnPropertyChanged(nameof(VpnConnectedServerName));
             AppendLog($"VPN: подключено к {server.Name} ({server.Address}:{server.Port}).");
         }
         catch (Exception ex)

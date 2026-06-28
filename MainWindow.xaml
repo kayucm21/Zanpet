@@ -116,7 +116,7 @@
                     </Border>
                     <Border CornerRadius="6" Background="{StaticResource AccentSoftBrush}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
                             Padding="7,2" Margin="6,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="v2.0.0" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
+                        <TextBlock Text="v2.1.5" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
                     </Border>
                 </StackPanel>
 
@@ -295,6 +295,18 @@
 
                             <emoji:TextBlock Text="{Binding SimpleStatus}" Style="{StaticResource Muted}" FontSize="13"
                                        HorizontalAlignment="Center" TextAlignment="Center" Margin="0,20,0,0"/>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0"
+                                        Visibility="{Binding IsVpnConnected, Converter={StaticResource BoolToVis}}">
+                                <Ellipse Width="7" Height="7" VerticalAlignment="Center" Margin="0,0,8,0"
+                                         Fill="{StaticResource AccentBrush}"/>
+                                <TextBlock FontFamily="{StaticResource DisplayFont}" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center">
+                                    <Run Text="VPN"/>
+                                    <Run Text=" | "/>
+                                    <Run Text="{Binding VpnConnectedServerName}"/>
+                                </TextBlock>
+                            </StackPanel>
 
                             <ProgressBar Value="{Binding UpdateProgress, Mode=OneWay}" Maximum="1" Margin="0,16,0,0"
                                          Visibility="{Binding IsUpdating, Converter={StaticResource BoolToVis}}"/>
@@ -631,9 +643,13 @@
                                                                 <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
                                                                     <Setter Property="Content" Value="Подключить"/>
                                                                     <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding DataContext.IsVpnConnected, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                                                            <Setter Property="Content" Value="Отключить"/>
-                                                                            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+                                                                        <DataTrigger Value="Visible">
+                                                                            <DataTrigger.Binding>
+                                                                                <MultiBinding Converter="{StaticResource StringEqToVis}">
+                                                                                    <Binding Path="Name"/>
+                                                                                    <Binding Path="DataContext.VpnConnectedServerName" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                                                </MultiBinding>
+                                                                            </DataTrigger.Binding>
                                                                         </DataTrigger>
                                                                     </Style.Triggers>
                                                                 </Style>

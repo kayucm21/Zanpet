@@ -11,6 +11,7 @@
     <mvvm:DiagStatusToTextConverter x:Key="DiagText"/>
     <mvvm:DiagStatusToBrushConverter x:Key="DiagBrush"/>
     <mvvm:RefEqualsToVisibilityConverter x:Key="RefEqualsToVis"/>
+    <mvvm:StringEqualsToVisibilityConverter x:Key="StringEqToVis"/>
 
     <!-- ====================== Palette (redesign · concept C) ====================== -->
     <Color x:Key="C.Bg">#FF090C11</Color>

@@ -98,3 +98,33 @@ public sealed class DiagStatusToBrushConverter : IValueConverter
     };
     public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => Binding.DoNothing;
 }
+
+/// <summary>bool -> Visibility: Visible when True, Collapsed when False. With optional "invert" parameter.</summary>
+public sealed class BoolToVisConverter : IValueConverter
+{
+    public object Convert(object? v, Type t, object? p, CultureInfo c)
+    {
+        bool b = v is true;
+        if (p as string == "invert") b = !b;
+        return b ? Visibility.Visible : Visibility.Collapsed;
+    }
+    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) =>
+        v is Visibility.Visible;
+}
+
+/// <summary>Two strings -> Visibility: Visible when they match (case-insensitive), Collapsed otherwise.</summary>
+public sealed class StringEqualsToVisibilityConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type t, object? p, CultureInfo c)
+    {
+        if (values.Length != 2) return Visibility.Collapsed;
+        string? a = values[0] as string;
+        string? b = values[1] as string;
+        bool invert = p as string == "invert";
+        bool match = string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+        if (invert) match = !match;
+        return match ? Visibility.Visible : Visibility.Collapsed;
+    }
+    public object[] ConvertBack(object? v, Type[] t, object? p, CultureInfo c) =>
+        throw new NotSupportedException();
+}
