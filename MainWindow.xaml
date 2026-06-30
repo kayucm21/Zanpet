@@ -116,7 +116,7 @@
                     </Border>
                     <Border CornerRadius="6" Background="{StaticResource AccentSoftBrush}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
                             Padding="7,2" Margin="6,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="v2.1.7" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
+                        <TextBlock Text="v2.1.8" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
                     </Border>
                 </StackPanel>
 
@@ -304,7 +304,7 @@
                                            Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center">
                                     <Run Text="VPN"/>
                                     <Run Text=" | "/>
-                                    <Run Text="{Binding VpnConnectedServerName}"/>
+                                    <Run Text="{Binding VpnConnectedServerName, Mode=OneWay}"/>
                                 </TextBlock>
                             </StackPanel>
 
