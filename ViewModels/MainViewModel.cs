@@ -735,7 +735,8 @@ public sealed class MainViewModel : ObservableObject
         {
             if (_vpn.IsConnected)
             {
-                _vpn.Stop();
+                foreach (var s in VpnServers) s.IsConnected = false;
+                await Task.Run(() => _vpn.Stop());
                 VpnConnectedServerName = "";
                 VpnStatus = "Отключено.";
                 OnPropertyChanged(nameof(IsVpnConnected));
@@ -758,6 +759,8 @@ public sealed class MainViewModel : ObservableObject
                 }
             }
 
+            foreach (var s in VpnServers) s.IsConnected = false;
+            server.IsConnected = true;
             _vpn.Start(server);
             VpnConnectedServerName = server.Name;
             VpnStatus = $"Подключено к {server.Name}";

@@ -116,7 +116,7 @@
                     </Border>
                     <Border CornerRadius="6" Background="{StaticResource AccentSoftBrush}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
                             Padding="7,2" Margin="6,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="v2.1.6" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
+                        <TextBlock Text="v2.1.7" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
                     </Border>
                 </StackPanel>
 
@@ -643,13 +643,7 @@
                                                                 <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
                                                                     <Setter Property="Content" Value="Подключить"/>
                                                                     <Style.Triggers>
-                                                                        <DataTrigger Value="Visible">
-                                                                            <DataTrigger.Binding>
-                                                                                <MultiBinding Converter="{StaticResource StringEqToVis}">
-                                                                                    <Binding Path="Name"/>
-                                                                                    <Binding Path="DataContext.VpnConnectedServerName" RelativeSource="{RelativeSource AncestorType=Window}"/>
-                                                                                </MultiBinding>
-                                                                            </DataTrigger.Binding>
+                                                                        <DataTrigger Binding="{Binding IsConnected}" Value="True">
                                                                             <Setter Property="Content" Value="Отключить"/>
                                                                             <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
                                                                         </DataTrigger>

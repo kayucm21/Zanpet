@@ -1,10 +1,15 @@
+using ZapretUI.Mvvm;
+
 namespace ZapretUI.Models;
 
 /// <summary>
 /// Parsed VLESS/REALITY server from a subscription.
 /// </summary>
-public sealed class VpnServer
+public sealed class VpnServer : ObservableObject
 {
+    private bool _isConnected;
+    public bool IsConnected { get => _isConnected; set => SetField(ref _isConnected, value); }
+
     public string Name { get; set; } = "";
     public string Address { get; set; } = "";
     public int Port { get; set; }
