@@ -302,7 +302,7 @@ public sealed class VpnService : IDisposable
         if (!IsXrayInstalled) throw new FileNotFoundException("xray.exe не найден. Скачайте xray-core.");
 
         string configJson = GenerateConfig(server);
-        File.WriteAllText(XrayConfigPath, configJson, Encoding.UTF8);
+        File.WriteAllText(XrayConfigPath, configJson, new UTF8Encoding(false));
         LogLine?.Invoke($"[vpn] Config:\n{configJson}");
 
         var psi = new ProcessStartInfo
