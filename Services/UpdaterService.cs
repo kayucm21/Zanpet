@@ -137,14 +137,16 @@ public sealed class UpdaterService
             progress?.Report(1);
             Directory.CreateDirectory(stageDir);
 
-            using (var zip = ZipFile.OpenRead(zipPath))
+            using (var zipStream = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read))
             {
-                foreach (var entry in zip.Entries)
+                foreach (var entry in archive.Entries)
                 {
-                    if (entry.FullName.EndsWith('/')) continue;
                     if (string.IsNullOrEmpty(entry.Name)) continue;
                     string dest = Path.Combine(stageDir, entry.Name);
-                    entry.ExtractToFile(dest, overwrite: true);
+                    using var src = entry.Open();
+                    using var dst = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None);
+                    src.CopyTo(dst);
                 }
             }
 
