@@ -594,11 +594,29 @@ public sealed class MainViewModel : ObservableObject
                     if (!silent)
                     {
                         var result = MessageBox.Show(
-                            $"Доступна новая версия приложения: {appInfo.Tag}\n\nОткрыть страницу загрузки?",
+                            $"Доступна новая версия приложения: {appInfo.Tag}\n\nСкачать и установить?",
                             "Обновление приложения",
                             MessageBoxButton.YesNo, MessageBoxImage.Information);
                         if (result == MessageBoxResult.Yes)
-                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(appInfo.Url) { UseShellExecute = true });
+                        {
+                            UpdateStatus = $"Загрузка {appInfo.Tag}…";
+                            AppendLog($"Загрузка обновления {appInfo.Tag}…");
+                            var progress = new Progress<double>(p =>
+                            {
+                                UpdateProgress = p;
+                                UpdateStatus = $"Загрузка {appInfo.Tag}… {p:P0}";
+                            });
+                            try
+                            {
+                                await _updater.InstallAppUpdateAsync(appInfo.Tag, progress);
+                            }
+                            catch (Exception ex)
+                            {
+                                UpdateStatus = $"Ошибка обновления: {ex.Message}";
+                                AppendLog($"Ошибка обновления: {ex.Message}");
+                                MessageBox.Show($"Ошибка обновления: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                            }
+                        }
                     }
                 }
             }

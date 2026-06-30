@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using ZapretUI.Models;
@@ -82,6 +83,100 @@ public sealed class UpdaterService
             return string.IsNullOrEmpty(tag) ? null : (tag, url);
         }
         catch { return null; }
+    }
+
+    /// <summary>Fetch the zip download URL for a specific app release tag.</summary>
+    public async Task<string?> FetchAppZipUrlAsync(string tag, CancellationToken ct = default)
+    {
+        try
+        {
+            string apiUrl = $"https://api.github.com/repos/kayucm21/Zanpet/releases/tags/{tag}";
+            using var resp = await _http.GetAsync(apiUrl, ct).ConfigureAwait(false);
+            resp.EnsureSuccessStatusCode();
+            using var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false), cancellationToken: ct).ConfigureAwait(false);
+            foreach (var asset in doc.RootElement.GetProperty("assets").EnumerateArray())
+            {
+                string name = asset.GetProperty("name").GetString() ?? "";
+                if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                    return asset.GetProperty("browser_download_url").GetString();
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>Download app update, extract, replace files and restart.</summary>
+    public async Task InstallAppUpdateAsync(string tag, IProgress<double>? progress = null, CancellationToken ct = default)
+    {
+        string? zipUrl = await FetchAppZipUrlAsync(tag, ct).ConfigureAwait(false);
+        if (zipUrl is null) throw new InvalidOperationException("Не найден zip-файл релиза.");
+
+        string zipPath = Path.Combine(Path.GetTempPath(), $"ZapretUI-{tag}.zip");
+        string stageDir = Path.Combine(Path.GetTempPath(), $"ZapretUI-stage-{Guid.NewGuid():N}");
+
+        try
+        {
+            progress?.Report(0);
+            using (var dl = await _http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
+            {
+                dl.EnsureSuccessStatusCode();
+                long total = dl.Content.Headers.ContentLength ?? 0;
+                await using var stream = await dl.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                await using var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, true);
+                var buf = new byte[1 << 16];
+                long read = 0;
+                int n;
+                while ((n = await stream.ReadAsync(buf, ct).ConfigureAwait(false)) > 0)
+                {
+                    await fs.WriteAsync(buf.AsMemory(0, n), ct).ConfigureAwait(false);
+                    read += n;
+                    if (total > 0) progress?.Report((double)read / total);
+                }
+            }
+
+            progress?.Report(1);
+            Directory.CreateDirectory(stageDir);
+
+            using (var zip = ZipFile.OpenRead(zipPath))
+            {
+                foreach (var entry in zip.Entries)
+                {
+                    if (entry.FullName.EndsWith('/')) continue;
+                    if (string.IsNullOrEmpty(entry.Name)) continue;
+                    string dest = Path.Combine(stageDir, entry.Name);
+                    entry.ExtractToFile(dest, overwrite: true);
+                }
+            }
+
+            string exeDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
+            string batPath = Path.Combine(Path.GetTempPath(), "ZapretUI-update.bat");
+            string selfExe = Environment.ProcessPath ?? Path.Combine(exeDir, "ZapretUI.exe");
+
+            var bat = new StringBuilder();
+            bat.AppendLine("@echo off");
+            bat.AppendLine("timeout /t 2 /nobreak >nul");
+            bat.AppendLine($"copy /Y \"{stageDir}\\*\" \"{exeDir}\\\" >nul 2>&1");
+            bat.AppendLine($"del /Q \"{zipPath}\" >nul 2>&1");
+            bat.AppendLine($"rmdir /S /Q \"{stageDir}\" >nul 2>&1");
+            bat.AppendLine($"start \"\" \"{selfExe}\"");
+            bat.AppendLine($"del /Q \"%~f0\" >nul 2>&1");
+
+            File.WriteAllText(batPath, bat.ToString(), Encoding.UTF8);
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = batPath,
+                UseShellExecute = true,
+                CreateNoWindow = true,
+            });
+
+            Environment.Exit(0);
+        }
+        catch
+        {
+            try { if (Directory.Exists(stageDir)) Directory.Delete(stageDir, true); } catch { }
+            throw;
+        }
     }
 
     /// <summary>Pull the numeric version out of an arbitrary release tag — handles any prefix

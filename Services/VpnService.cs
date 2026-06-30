@@ -218,7 +218,7 @@ public sealed class VpnService : IDisposable
     {
         var sb = new StringBuilder();
         sb.AppendLine("{");
-        sb.AppendLine("  \"log\": { \"loglevel\": \"warning\" },");
+        sb.AppendLine("  \"log\": { \"loglevel\": \"debug\" },");
         sb.AppendLine("  \"dns\": { \"servers\": [\"1.1.1.1\", \"8.8.8.8\"] },");
         sb.AppendLine("  \"inbounds\": [");
         sb.AppendLine("    {");
@@ -227,8 +227,7 @@ public sealed class VpnService : IDisposable
         sb.AppendLine("      \"settings\": { \"udp\": true },");
         sb.AppendLine("      \"sniffing\": {");
         sb.AppendLine("        \"enabled\": true,");
-        sb.AppendLine("        \"destOverride\": [\"http\", \"tls\"],");
-        sb.AppendLine("        \"routeOnly\": true");
+        sb.AppendLine("        \"destOverride\": [\"http\", \"tls\"]");
         sb.AppendLine("      },");
         sb.AppendLine("      \"tag\": \"socks-in\"");
         sb.AppendLine("    },");
@@ -322,7 +321,9 @@ public sealed class VpnService : IDisposable
         proc.ErrorDataReceived += (_, e) => { if (e.Data is not null) LogLine?.Invoke($"[xray] {e.Data}"); };
         proc.Exited += (_, _) =>
         {
-            LogLine?.Invoke("[xray] Процесс завершён.");
+            int exitCode = 0;
+            try { exitCode = proc.ExitCode; } catch { }
+            LogLine?.Invoke($"[xray] Процесс завершён (код: {exitCode}).");
             ClearSystemProxy();
         };
         proc.Start();
