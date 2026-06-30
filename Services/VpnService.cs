@@ -218,6 +218,15 @@ public sealed class VpnService : IDisposable
         var config = new Dictionary<string, object>
         {
             ["log"] = new Dictionary<string, object> { ["loglevel"] = "warning" },
+            ["dns"] = new Dictionary<string, object>
+            {
+                ["servers"] = new object[]
+                {
+                    "https://dns.google/dns-query",
+                    "https://1.1.1.1/dns-query",
+                    "https://8.8.8.8/dns-query",
+                },
+            },
             ["inbounds"] = new object[]
             {
                 new Dictionary<string, object>
@@ -225,12 +234,22 @@ public sealed class VpnService : IDisposable
                     ["port"] = 10808,
                     ["protocol"] = "socks",
                     ["settings"] = new Dictionary<string, object> { ["udp"] = true },
+                    ["sniffing"] = new Dictionary<string, object>
+                    {
+                        ["enabled"] = true,
+                        ["destOverride"] = new[] { "http", "tls" },
+                    },
                     ["tag"] = "socks-in",
                 },
                 new Dictionary<string, object>
                 {
                     ["port"] = 10809,
                     ["protocol"] = "http",
+                    ["sniffing"] = new Dictionary<string, object>
+                    {
+                        ["enabled"] = true,
+                        ["destOverride"] = new[] { "http", "tls" },
+                    },
                     ["tag"] = "http-in",
                 },
             },
@@ -286,6 +305,19 @@ public sealed class VpnService : IDisposable
     }
 
     // ---- start / stop ----
+
+    public async Task<int> PingAsync(string host, int port, CancellationToken ct = default)
+    {
+        try
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            using var tcp = new System.Net.Sockets.TcpClient();
+            await tcp.ConnectAsync(host, port, ct).ConfigureAwait(false);
+            sw.Stop();
+            return (int)sw.ElapsedMilliseconds;
+        }
+        catch { return -1; }
+    }
 
     public void Start(VpnServer server)
     {

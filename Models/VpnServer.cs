@@ -10,6 +10,12 @@ public sealed class VpnServer : ObservableObject
     private bool _isConnected;
     public bool IsConnected { get => _isConnected; set => SetField(ref _isConnected, value); }
 
+    private int _pingMs = -1;
+    public int PingMs { get => _pingMs; set => SetField(ref _pingMs, value); }
+
+    private string _pingStatus = "";
+    public string PingStatus { get => _pingStatus; set => SetField(ref _pingStatus, value); }
+
     public string Name { get; set; } = "";
     public string Address { get; set; } = "";
     public int Port { get; set; }

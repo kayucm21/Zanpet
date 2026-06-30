@@ -116,7 +116,7 @@
                     </Border>
                     <Border CornerRadius="6" Background="{StaticResource AccentSoftBrush}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
                             Padding="7,2" Margin="6,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="v2.1.8" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
+                        <TextBlock Text="v2.2.0" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
                     </Border>
                 </StackPanel>
 
@@ -608,9 +608,25 @@
 
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
-                                    <TextBlock Text="Доступные серверы" Style="{StaticResource H2}" Margin="0,0,0,8"/>
-                                    <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,0,0,10"
-                                               Text="{Binding VpnStatus}"/>
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Доступные серверы" Style="{StaticResource H2}"/>
+                                            <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0"
+                                                       Text="{Binding VpnStatus}"/>
+                                            <TextBlock Style="{StaticResource Muted}" FontSize="10.5" Margin="0,2,0,0"
+                                                       Text="{Binding LastRefreshTime, StringFormat='Обновлено: {0}'}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                                            <Button Content="Пинг" Command="{Binding VpnPingCommand}"
+                                                    Style="{StaticResource GhostButton}" Margin="0,0,6,0" FontSize="11"/>
+                                            <Button Content="Обновить" Command="{Binding VpnRefreshCommand}"
+                                                    Style="{StaticResource GhostButton}" FontSize="11"/>
+                                        </StackPanel>
+                                    </Grid>
                                     <ItemsControl ItemsSource="{Binding VpnServers}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -623,7 +639,12 @@
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
                                                         <StackPanel Grid.Column="0">
-                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/>
+                                                                <TextBlock Text="{Binding PingStatus}" FontSize="11" Margin="10,0,0,0"
+                                                                           VerticalAlignment="Center" FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource AccentBrush}"/>
+                                                            </StackPanel>
                                                             <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="0,2,0,0">
                                                                 <Run Text="{Binding Network, Mode=OneWay}"/>
                                                                 <Run Text="/ "/>

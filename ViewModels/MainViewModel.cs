@@ -63,6 +63,8 @@ public sealed class MainViewModel : ObservableObject
 
         VpnDownloadXrayCommand = new RelayCommand(async _ => await VpnDownloadXrayAsync(), _ => !IsVpnBusy);
         VpnConnectCommand = new RelayCommand(async s => await VpnConnectAsync(s as VpnServer), _ => !IsVpnBusy);
+        VpnPingCommand = new RelayCommand(async _ => await VpnPingAllAsync(), _ => !IsVpnBusy);
+        VpnRefreshCommand = new RelayCommand(async _ => await VpnRefreshAsync(), _ => !IsVpnBusy);
 
         _vpn.LogLine += line => OnUi(() => AppendLog(line));
 
@@ -144,6 +146,8 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand TogglePresetArgsCommand { get; }
     public RelayCommand VpnDownloadXrayCommand { get; }
     public RelayCommand VpnConnectCommand { get; }
+    public RelayCommand VpnPingCommand { get; }
+    public RelayCommand VpnRefreshCommand { get; }
 
     // ---- engine state ------------------------------------------------------
 
@@ -281,6 +285,9 @@ public sealed class MainViewModel : ObservableObject
 
     private string _vpnConnectedServerName = "";
     public string VpnConnectedServerName { get => _vpnConnectedServerName; private set => SetField(ref _vpnConnectedServerName, value); }
+
+    private string _lastRefreshTime = "";
+    public string LastRefreshTime { get => _lastRefreshTime; private set => SetField(ref _lastRefreshTime, value); }
 
     public bool IsVpnConnected => _vpn.IsConnected;
 
@@ -772,6 +779,46 @@ public sealed class MainViewModel : ObservableObject
         {
             VpnStatus = $"Ошибка: {ex.Message}";
             AppendLog($"VPN ошибка: {ex.Message}");
+        }
+    }
+
+    private async Task VpnPingAllAsync()
+    {
+        try
+        {
+            foreach (var s in VpnServers) { s.PingMs = -1; s.PingStatus = "Пинг…"; }
+            AppendLog("VPN: пинг серверов…");
+            foreach (var s in VpnServers)
+            {
+                int ms = await _vpn.PingAsync(s.Address, s.Port);
+                s.PingMs = ms;
+                s.PingStatus = ms >= 0 ? $"{ms} мс" : "нет ответа";
+            }
+            AppendLog("VPN: пинг завершён.");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"VPN пинг ошибка: {ex.Message}");
+        }
+    }
+
+    private async Task VpnRefreshAsync()
+    {
+        try
+        {
+            VpnStatus = "Обновление подписки…";
+            AppendLog("VPN: обновление подписки…");
+            var servers = await _vpn.FetchSubscriptionAsync(VpnService.VpnSubscriptionUrl);
+            VpnServers.Clear();
+            foreach (var s in servers) VpnServers.Add(s);
+            LastRefreshTime = DateTime.Now.ToString("HH:mm:ss dd.MM.yyyy");
+            VpnStatus = $"Обновлено. {servers.Count} серверов.";
+            AppendLog($"VPN: подписка обновлена. {servers.Count} серверов.");
+        }
+        catch (Exception ex)
+        {
+            VpnStatus = $"Ошибка обновления: {ex.Message}";
+            AppendLog($"VPN ошибка обновления: {ex.Message}");
         }
     }
 
