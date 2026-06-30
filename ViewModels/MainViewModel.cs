@@ -770,10 +770,37 @@ public sealed class MainViewModel : ObservableObject
             server.IsConnected = true;
             _vpn.Start(server);
             VpnConnectedServerName = server.Name;
-            VpnStatus = $"Подключено к {server.Name}";
+            VpnStatus = $"Подключение к {server.Name}…";
             OnPropertyChanged(nameof(IsVpnConnected));
             OnPropertyChanged(nameof(VpnConnectedServerName));
-            AppendLog($"VPN: подключено к {server.Name} ({server.Address}:{server.Port}).");
+            AppendLog($"VPN: подключение к {server.Name} ({server.Address}:{server.Port})…");
+
+            await Task.Delay(2000);
+
+            if (!_vpn.IsConnected)
+            {
+                server.IsConnected = false;
+                VpnConnectedServerName = "";
+                VpnStatus = "xray завершился. Проверьте журнал.";
+                OnPropertyChanged(nameof(IsVpnConnected));
+                OnPropertyChanged(nameof(VpnConnectedServerName));
+                AppendLog("VPN: xray завершился сразу после запуска! Проверьте журнал.");
+                return;
+            }
+
+            VpnStatus = $"Подключено к {server.Name}. Проверка…";
+            AppendLog("VPN: xray работает. Проверяю прокси…");
+            bool ok = await _vpn.TestProxyAsync();
+            if (ok)
+            {
+                VpnStatus = $"Подключено к {server.Name}. Работает!";
+                AppendLog("VPN: прокси работает! Интернет через VPN.");
+            }
+            else
+            {
+                VpnStatus = $"Подключено к {server.Name}, но прокси не отвечает.";
+                AppendLog("VPN: прокси не отвечает. Проверьте журнал xray.");
+            }
         }
         catch (Exception ex)
         {

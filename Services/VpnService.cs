@@ -1,18 +1,16 @@
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using ZapretUI.Models;
 
 namespace ZapretUI.Services;
 
-/// <summary>
-/// Manages VPN via xray-core: subscription parsing, download, config generation,
-/// start/stop of the xray process, and system proxy toggle.
-/// </summary>
 public sealed class VpnService : IDisposable
 {
     private Process? _proc;
@@ -21,8 +19,6 @@ public sealed class VpnService : IDisposable
     public bool IsConnected => _proc is { HasExited: false };
 
     public event Action<string>? LogLine;
-
-    // ---- paths ----
 
     private static string XrayDir => Path.Combine(AppPaths.EngineDir, "xray");
     private static string XrayExe => Path.Combine(XrayDir, "xray.exe");
@@ -35,8 +31,8 @@ public sealed class VpnService : IDisposable
     public VpnService()
     {
         _http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        _http.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("ZapretUI", "2.1"));
-        _http.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+        _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("ZapretUI", "2.2"));
+        _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
     }
 
     // ---- subscription parsing ----
@@ -62,7 +58,6 @@ public sealed class VpnService : IDisposable
     {
         try
         {
-            // vless://uuid@address:port?params#name
             var rest = uri["vless://".Length..];
             int hashIdx = rest.IndexOf('#');
             string name = hashIdx >= 0 ? Uri.UnescapeDataString(rest[(hashIdx + 1)..]) : "Server";
@@ -182,6 +177,41 @@ public sealed class VpnService : IDisposable
             throw new FileNotFoundException($"xray.exe не найден в {XrayDir} после распаковки.");
     }
 
+    // ---- ping ----
+
+    public async Task<int> PingAsync(string host, int port, CancellationToken ct = default)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(3));
+            var sw = Stopwatch.StartNew();
+            using var tcp = new TcpClient();
+            await tcp.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
+            sw.Stop();
+            return (int)sw.ElapsedMilliseconds;
+        }
+        catch { return -1; }
+    }
+
+    // ---- test connectivity through proxy ----
+
+    public async Task<bool> TestProxyAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            using var handler = new HttpClientHandler
+            {
+                Proxy = new WebProxy("http://127.0.0.1:10809"),
+                UseProxy = true,
+            };
+            using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
+            using var resp = await client.GetAsync("http://httpbin.org/ip", ct).ConfigureAwait(false);
+            return resp.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     // ---- xray config generation ----
 
     private static string GenerateConfig(VpnServer server)
@@ -217,14 +247,14 @@ public sealed class VpnService : IDisposable
 
         var config = new Dictionary<string, object>
         {
-            ["log"] = new Dictionary<string, object> { ["loglevel"] = "warning" },
+            ["log"] = new Dictionary<string, object> { ["loglevel"] = "debug" },
             ["dns"] = new Dictionary<string, object>
             {
                 ["servers"] = new object[]
                 {
-                    "https://dns.google/dns-query",
-                    "https://1.1.1.1/dns-query",
-                    "https://8.8.8.8/dns-query",
+                    "1.1.1.1",
+                    "8.8.8.8",
+                    "localhost",
                 },
             },
             ["inbounds"] = new object[]
@@ -238,6 +268,7 @@ public sealed class VpnService : IDisposable
                     {
                         ["enabled"] = true,
                         ["destOverride"] = new[] { "http", "tls" },
+                        ["routeOnly"] = true,
                     },
                     ["tag"] = "socks-in",
                 },
@@ -245,11 +276,6 @@ public sealed class VpnService : IDisposable
                 {
                     ["port"] = 10809,
                     ["protocol"] = "http",
-                    ["sniffing"] = new Dictionary<string, object>
-                    {
-                        ["enabled"] = true,
-                        ["destOverride"] = new[] { "http", "tls" },
-                    },
                     ["tag"] = "http-in",
                 },
             },
@@ -285,10 +311,15 @@ public sealed class VpnService : IDisposable
                     ["protocol"] = "freedom",
                     ["tag"] = "direct",
                 },
+                new Dictionary<string, object>
+                {
+                    ["protocol"] = "blackhole",
+                    ["tag"] = "block",
+                },
             },
             ["routing"] = new Dictionary<string, object>
             {
-                ["domainStrategy"] = "AsIs",
+                ["domainStrategy"] = "IPIfNonMatch",
                 ["rules"] = new object[]
                 {
                     new Dictionary<string, object>
@@ -306,25 +337,14 @@ public sealed class VpnService : IDisposable
 
     // ---- start / stop ----
 
-    public async Task<int> PingAsync(string host, int port, CancellationToken ct = default)
-    {
-        try
-        {
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            using var tcp = new System.Net.Sockets.TcpClient();
-            await tcp.ConnectAsync(host, port, ct).ConfigureAwait(false);
-            sw.Stop();
-            return (int)sw.ElapsedMilliseconds;
-        }
-        catch { return -1; }
-    }
-
     public void Start(VpnServer server)
     {
         if (IsConnected) Stop();
         if (!IsXrayInstalled) throw new FileNotFoundException("xray.exe не найден. Скачайте xray-core.");
 
-        File.WriteAllText(XrayConfigPath, GenerateConfig(server));
+        string configJson = GenerateConfig(server);
+        File.WriteAllText(XrayConfigPath, configJson, Encoding.UTF8);
+        LogLine?.Invoke($"[vpn] Config:\n{configJson}");
 
         var psi = new ProcessStartInfo
         {
@@ -340,7 +360,11 @@ public sealed class VpnService : IDisposable
         var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
         proc.OutputDataReceived += (_, e) => { if (e.Data is not null) LogLine?.Invoke($"[xray] {e.Data}"); };
         proc.ErrorDataReceived += (_, e) => { if (e.Data is not null) LogLine?.Invoke($"[xray] {e.Data}"); };
-        proc.Exited += (_, _) => { LogLine?.Invoke("[xray] Процесс завершён."); };
+        proc.Exited += (_, _) =>
+        {
+            LogLine?.Invoke("[xray] Процесс завершён.");
+            ClearSystemProxy();
+        };
         proc.Start();
         proc.BeginOutputReadLine();
         proc.BeginErrorReadLine();
