@@ -303,8 +303,15 @@ public sealed class UpdaterService
     }
 
     /// <summary>True if a newer release than the installed one is available.</summary>
-    public bool IsUpdateAvailable(ReleaseInfo latest) =>
-        !string.Equals(InstalledVersion, latest.Tag, StringComparison.OrdinalIgnoreCase);
+    public bool IsUpdateAvailable(ReleaseInfo latest)
+    {
+        if (string.IsNullOrEmpty(InstalledVersion)) return true;
+        var installed = ParseTagVersion(InstalledVersion);
+        var latestVer = ParseTagVersion(latest.Tag);
+        if (installed is null || latestVer is null)
+            return !string.Equals(InstalledVersion, latest.Tag, StringComparison.OrdinalIgnoreCase);
+        return latestVer > installed;
+    }
 
     /// <summary>Download, verify and install the engine from the given release.</summary>
     public async Task InstallAsync(

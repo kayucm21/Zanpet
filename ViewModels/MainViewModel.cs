@@ -101,17 +101,10 @@ public sealed class MainViewModel : ObservableObject
                 AppendLog("VPN: xray-core уже установлен.");
             }
 
-            var servers = _vpn.LoadCachedSubscription();
-            if (servers.Count == 0)
-            {
-                AppendLog("VPN: загрузка подписки…");
-                servers = await _vpn.FetchSubscriptionAsync(VpnService.VpnSubscriptionUrl);
-            }
+            var servers = _vpn.GetDefaultServers();
             VpnServers.Clear();
             foreach (var s in servers) VpnServers.Add(s);
-            VpnStatus = servers.Count > 0
-                ? $"Загружено {servers.Count} серверов."
-                : "Нет серверов.";
+            VpnStatus = $"{servers.Count} серверов.";
             AppendLog($"VPN: {servers.Count} серверов загружено.");
         }
         catch (Exception ex)
@@ -274,6 +267,8 @@ public sealed class MainViewModel : ObservableObject
 
     private string _engineVersion = "—";
     public string EngineVersion { get => _engineVersion; private set => SetField(ref _engineVersion, value); }
+
+    public string AppVersion => "v" + UpdaterService.AppVersion;
 
     // ---- VPN ---------------------------------------------------------------
 
@@ -539,7 +534,8 @@ public sealed class MainViewModel : ObservableObject
                 return;
             }
 
-            if (!_updater.IsEngineInstalled || !_updater.IsEngineComplete || _updater.IsUpdateAvailable(latest))
+            bool needsUpdate = !_updater.IsEngineInstalled || _updater.IsUpdateAvailable(latest);
+            if (needsUpdate)
             {
                 AppendLog($"Доступно обновление движка: {latest.Tag}. Загрузка…");
                 bool wasRunning = IsRunning;
@@ -578,8 +574,9 @@ public sealed class MainViewModel : ObservableObject
             }
             else
             {
-                UpdateStatus = $"Актуальная версия движка: {latest.Tag}";
-                AppendLog($"Движок актуален: {latest.Tag}");
+                string installed = _updater.InstalledVersion ?? "—";
+                UpdateStatus = $"Движок актуален: {installed} (GitHub: {latest.Tag})";
+                AppendLog($"Движок актуален: {installed} (GitHub: {latest.Tag})");
             }
 
             // --- 2. Check app update (kayucm21/Zanpet) ---
@@ -784,40 +781,61 @@ public sealed class MainViewModel : ObservableObject
                 }
             }
 
-            foreach (var s in VpnServers) s.IsConnected = false;
-            server.IsConnected = true;
-            _vpn.Start(server);
-            VpnConnectedServerName = server.Name;
-            VpnStatus = $"Подключение к {server.Name}…";
-            OnPropertyChanged(nameof(IsVpnConnected));
-            OnPropertyChanged(nameof(VpnConnectedServerName));
-            AppendLog($"VPN: подключение к {server.Name} ({server.Address}:{server.Port})…");
-
-            await Task.Delay(2000);
-
-            if (!_vpn.IsConnected)
+            // Try the selected server first, then fallback to others
+            var serversToTry = new List<VpnServer> { server };
+            foreach (var s in VpnServers)
             {
-                server.IsConnected = false;
-                VpnConnectedServerName = "";
-                VpnStatus = "xray завершился. Проверьте журнал.";
+                if (s != server) serversToTry.Add(s);
+            }
+
+            bool connected = false;
+            foreach (var srv in serversToTry)
+            {
+                foreach (var s in VpnServers) s.IsConnected = false;
+                srv.IsConnected = true;
+                _vpn.Start(srv);
+                VpnConnectedServerName = srv.Name;
+                VpnStatus = $"Подключение к {srv.Name} ({srv.Network}:{srv.Port})…";
                 OnPropertyChanged(nameof(IsVpnConnected));
                 OnPropertyChanged(nameof(VpnConnectedServerName));
-                AppendLog("VPN: xray завершился сразу после запуска! Проверьте журнал.");
-                return;
+                AppendLog($"VPN: подключение к {srv.Name} ({srv.Address}:{srv.Port})…");
+
+                await Task.Delay(3000);
+
+                if (!_vpn.IsConnected)
+                {
+                    srv.IsConnected = false;
+                    AppendLog($"VPN: {srv.Name} — xray завершился. Пробую следующий сервер…");
+                    continue;
+                }
+
+                VpnStatus = $"Подключение к {srv.Name}. Проверка прокси…";
+                AppendLog($"VPN: xray работает. Проверяю доступность интернета…");
+                bool ok = await _vpn.TestProxyAsync();
+                if (ok)
+                {
+                    connected = true;
+                    VpnStatus = $"Подключено к {srv.Name}. Работает!";
+                    AppendLog($"VPN: HTTP-прокси работает! Интернет через VPN ({srv.Name}).");
+                    AppendLog("VPN: Если сайты не открывается — перезапустите браузер!");
+                    break;
+                }
+                else
+                {
+                    AppendLog($"VPN: {srv.Name} — прокси не отвечает. Останавливаю, пробую другой…");
+                    await Task.Run(() => _vpn.Stop());
+                    srv.IsConnected = false;
+                    await Task.Delay(500);
+                }
             }
 
-            VpnStatus = $"Подключено к {server.Name}. Проверка…";
-            AppendLog("VPN: xray работает. Проверяю прокси…");
-            bool ok = await _vpn.TestProxyAsync();
-            if (ok)
+            if (!connected)
             {
-                VpnStatus = $"Подключено к {server.Name}. Работает!";
-                AppendLog("VPN: прокси работает! Интернет через VPN.");
-            }
-            else
-            {
-                VpnStatus = $"Подключено к {server.Name}, но прокси не отвечает.";
-                AppendLog("VPN: прокси не отвечает. Проверьте журнал xray.");
+                VpnConnectedServerName = "";
+                VpnStatus = "Все серверы недоступны.";
+                OnPropertyChanged(nameof(IsVpnConnected));
+                OnPropertyChanged(nameof(VpnConnectedServerName));
+                AppendLog("VPN: все серверы недоступны. Проверьте интернет и попробуйте снова.");
             }
         }
         catch (Exception ex)
@@ -851,9 +869,9 @@ public sealed class MainViewModel : ObservableObject
     {
         try
         {
-            VpnStatus = "Обновление подписки…";
-            AppendLog("VPN: обновление подписки…");
-            var servers = await _vpn.FetchSubscriptionAsync(VpnService.VpnSubscriptionUrl);
+            VpnStatus = "Обновление серверов…";
+            AppendLog("VPN: обновление серверов…");
+            var servers = _vpn.GetDefaultServers();
             VpnServers.Clear();
             foreach (var s in servers) VpnServers.Add(s);
             LastRefreshTime = DateTime.Now.ToString("HH:mm:ss dd.MM.yyyy");
