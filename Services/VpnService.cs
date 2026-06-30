@@ -216,124 +216,84 @@ public sealed class VpnService : IDisposable
 
     private static string GenerateConfig(VpnServer server)
     {
-        var streamSettings = new Dictionary<string, object>
-        {
-            ["network"] = server.Network,
-            ["security"] = server.Security,
-        };
+        var sb = new StringBuilder();
+        sb.AppendLine("{");
+        sb.AppendLine("  \"log\": { \"loglevel\": \"warning\" },");
+        sb.AppendLine("  \"dns\": { \"servers\": [\"1.1.1.1\", \"8.8.8.8\"] },");
+        sb.AppendLine("  \"inbounds\": [");
+        sb.AppendLine("    {");
+        sb.AppendLine("      \"port\": 10808,");
+        sb.AppendLine("      \"protocol\": \"socks\",");
+        sb.AppendLine("      \"settings\": { \"udp\": true },");
+        sb.AppendLine("      \"sniffing\": {");
+        sb.AppendLine("        \"enabled\": true,");
+        sb.AppendLine("        \"destOverride\": [\"http\", \"tls\"],");
+        sb.AppendLine("        \"routeOnly\": true");
+        sb.AppendLine("      },");
+        sb.AppendLine("      \"tag\": \"socks-in\"");
+        sb.AppendLine("    },");
+        sb.AppendLine("    {");
+        sb.AppendLine("      \"port\": 10809,");
+        sb.AppendLine("      \"protocol\": \"http\",");
+        sb.AppendLine("      \"tag\": \"http-in\"");
+        sb.AppendLine("    }");
+        sb.AppendLine("  ],");
+        sb.AppendLine("  \"outbounds\": [");
+        sb.AppendLine("    {");
+        sb.AppendLine("      \"protocol\": \"vless\",");
+        sb.AppendLine("      \"settings\": {");
+        sb.AppendLine("        \"vnext\": [{");
+        sb.AppendLine($"          \"address\": \"{Esc(server.Address)}\",");
+        sb.AppendLine($"          \"port\": {server.Port},");
+        sb.AppendLine("          \"users\": [{");
+        sb.AppendLine($"            \"id\": \"{Esc(server.Uuid)}\",");
+        sb.AppendLine("            \"encryption\": \"none\"");
+        sb.AppendLine("          }]");
+        sb.AppendLine("        }]");
+        sb.AppendLine("      },");
+        sb.AppendLine("      \"streamSettings\": {");
+        sb.AppendLine($"        \"network\": \"{server.Network}\",");
+        sb.AppendLine($"        \"security\": \"{server.Security}\"");
 
         if (server.Security == "reality")
         {
-            var reality = new Dictionary<string, object>
-            {
-                ["serverName"] = server.Sni,
-                ["fingerprint"] = server.Fingerprint,
-                ["publicKey"] = server.PublicKey,
-                ["shortId"] = server.ShortId,
-            };
+            sb.AppendLine("        ,\"realitySettings\": {");
+            sb.AppendLine($"          \"serverName\": \"{Esc(server.Sni)}\",");
+            sb.AppendLine($"          \"fingerprint\": \"{Esc(server.Fingerprint)}\",");
+            sb.AppendLine($"          \"publicKey\": \"{Esc(server.PublicKey)}\",");
+            sb.AppendLine($"          \"shortId\": \"{Esc(server.ShortId)}\"");
             if (server.Network == "xhttp" && !string.IsNullOrEmpty(server.Spx))
-                reality["path"] = server.Spx;
-            streamSettings["realitySettings"] = reality;
+                sb.AppendLine($"          ,\"path\": \"{Esc(server.Spx)}\"");
+            sb.AppendLine("        }");
         }
 
         if (server.Network == "xhttp" && !string.IsNullOrEmpty(server.Spx))
         {
-            streamSettings["xhttpSettings"] = new Dictionary<string, object>
-            {
-                ["path"] = server.Spx,
-                ["mode"] = "auto",
-            };
+            sb.AppendLine("        ,\"xhttpSettings\": {");
+            sb.AppendLine($"          \"path\": \"{Esc(server.Spx)}\",");
+            sb.AppendLine("          \"mode\": \"auto\"");
+            sb.AppendLine("        }");
         }
 
-        var config = new Dictionary<string, object>
-        {
-            ["log"] = new Dictionary<string, object> { ["loglevel"] = "debug" },
-            ["dns"] = new Dictionary<string, object>
-            {
-                ["servers"] = new object[]
-                {
-                    "1.1.1.1",
-                    "8.8.8.8",
-                    "localhost",
-                },
-            },
-            ["inbounds"] = new object[]
-            {
-                new Dictionary<string, object>
-                {
-                    ["port"] = 10808,
-                    ["protocol"] = "socks",
-                    ["settings"] = new Dictionary<string, object> { ["udp"] = true },
-                    ["sniffing"] = new Dictionary<string, object>
-                    {
-                        ["enabled"] = true,
-                        ["destOverride"] = new[] { "http", "tls" },
-                        ["routeOnly"] = true,
-                    },
-                    ["tag"] = "socks-in",
-                },
-                new Dictionary<string, object>
-                {
-                    ["port"] = 10809,
-                    ["protocol"] = "http",
-                    ["tag"] = "http-in",
-                },
-            },
-            ["outbounds"] = new object[]
-            {
-                new Dictionary<string, object>
-                {
-                    ["protocol"] = "vless",
-                    ["settings"] = new Dictionary<string, object>
-                    {
-                        ["vnext"] = new object[]
-                        {
-                            new Dictionary<string, object>
-                            {
-                                ["address"] = server.Address,
-                                ["port"] = server.Port,
-                                ["users"] = new object[]
-                                {
-                                    new Dictionary<string, object>
-                                    {
-                                        ["id"] = server.Uuid,
-                                        ["encryption"] = "none",
-                                    },
-                                },
-                            },
-                        },
-                    },
-                    ["streamSettings"] = streamSettings,
-                    ["tag"] = "proxy",
-                },
-                new Dictionary<string, object>
-                {
-                    ["protocol"] = "freedom",
-                    ["tag"] = "direct",
-                },
-                new Dictionary<string, object>
-                {
-                    ["protocol"] = "blackhole",
-                    ["tag"] = "block",
-                },
-            },
-            ["routing"] = new Dictionary<string, object>
-            {
-                ["domainStrategy"] = "IPIfNonMatch",
-                ["rules"] = new object[]
-                {
-                    new Dictionary<string, object>
-                    {
-                        ["type"] = "field",
-                        ["outboundTag"] = "direct",
-                        ["ip"] = new[] { "geoip:private" },
-                    },
-                },
-            },
-        };
+        sb.AppendLine("      },");
+        sb.AppendLine("      \"tag\": \"proxy\"");
+        sb.AppendLine("    },");
+        sb.AppendLine("    { \"protocol\": \"freedom\", \"tag\": \"direct\" }");
+        sb.AppendLine("  ],");
+        sb.AppendLine("  \"routing\": {");
+        sb.AppendLine("    \"domainStrategy\": \"IPIfNonMatch\",");
+        sb.AppendLine("    \"rules\": [{");
+        sb.AppendLine("      \"type\": \"field\",");
+        sb.AppendLine("      \"outboundTag\": \"direct\",");
+        sb.AppendLine("      \"ip\": [\"geoip:private\"]");
+        sb.AppendLine("    }]");
+        sb.AppendLine("  }");
+        sb.AppendLine("}");
 
-        return JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+        return sb.ToString();
     }
+
+    private static string Esc(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     // ---- start / stop ----
 
