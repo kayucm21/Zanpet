@@ -16,16 +16,13 @@ jobs:
         dotnet-version: '9.0.x'
 
     - name: Install workloads
-      shell: pwsh
-      run: |
-        dotnet workload install maui-android 2>&1
-        dotnet workload list
+      run: dotnet workload install maui
+
+    - name: Restore
+      run: dotnet restore "mobile/ZapretUI Mobile.csproj"
 
     - name: Publish
-      shell: pwsh
-      run: |
-        dotnet publish "mobile/ZapretUI Mobile.csproj" -f net9.0-android -c Release -r android-arm64 -o ./artifacts 2>&1
-        if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE" }
+      run: dotnet publish "mobile/ZapretUI Mobile.csproj" -f net9.0-android -c Release -r android-arm64 -o ./artifacts
 
     - name: Upload
       if: always()
