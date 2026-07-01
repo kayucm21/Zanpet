@@ -143,7 +143,8 @@ public sealed class UpdaterService
                 foreach (var entry in archive.Entries)
                 {
                     if (string.IsNullOrEmpty(entry.Name)) continue;
-                    string dest = Path.Combine(stageDir, entry.Name);
+                    string dest = Path.Combine(stageDir, entry.FullName);
+                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                     using var src = entry.Open();
                     using var dst = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None);
                     src.CopyTo(dst);
@@ -157,7 +158,7 @@ public sealed class UpdaterService
             var bat = new StringBuilder();
             bat.AppendLine("@echo off");
             bat.AppendLine("timeout /t 2 /nobreak >nul");
-            bat.AppendLine($"copy /Y \"{stageDir}\\*\" \"{exeDir}\\\" >nul 2>&1");
+            bat.AppendLine($"xcopy /E /Y /I \"{stageDir}\\*\" \"{exeDir}\\\" >nul 2>&1");
             bat.AppendLine($"del /Q \"{zipPath}\" >nul 2>&1");
             bat.AppendLine($"rmdir /S /Q \"{stageDir}\" >nul 2>&1");
             bat.AppendLine($"start \"\" \"{selfExe}\"");
