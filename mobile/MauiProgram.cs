@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using ZapretUI_Mobile.Services;
 using ZapretUI_Mobile.ViewModels;
 
@@ -20,10 +19,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<XrayService>();
         builder.Services.AddSingleton<MainPageViewModel>();
         builder.Services.AddTransient<MainPage>();
-
-#if DEBUG
-        builder.Logging.AddDebug();
-#endif
 
         return builder.Build();
     }
