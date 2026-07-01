@@ -81,13 +81,19 @@ public class VpnService : global::Android.Net.VpnService
         var stopPendingIntent = PendingIntent.GetService(
             this, 0, stopIntent, PendingIntentFlags.Immutable);
 
+        var action = new Notification.Action.Builder(
+                global::Android.Resource.Drawable.IcMenuCloseClearCancel,
+                "Stop",
+                stopPendingIntent)
+            .Build();
+
         var builder = new Notification.Builder(this, CHANNEL_ID)
             .SetContentTitle("Zapret VPN")
             .SetContentText("VPN is active")
             .SetSmallIcon(global::Android.Resource.Drawable.IcMenuManage)
             .SetChannelId(CHANNEL_ID)
             .SetOngoing(true)
-            .AddAction(global::Android.Resource.Drawable.IcMenuCloseClearCancel, "Stop", stopPendingIntent!);
+            .AddAction(action);
 
         return builder.Build()!;
     }
