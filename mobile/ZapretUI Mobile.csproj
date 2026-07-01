@@ -13,6 +13,7 @@
     <ApplicationVersion>1</ApplicationVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">26</SupportedOSPlatformVersion>
     <SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
+    <NoWarn>CA1422</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
