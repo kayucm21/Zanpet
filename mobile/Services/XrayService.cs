@@ -5,6 +5,7 @@ using System.Text.Json;
 using Android.App;
 using Android.Content;
 using Android.Net;
+using Android.OS;
 using ZapretUI_Mobile.Models;
 
 namespace ZapretUI_Mobile.Services;

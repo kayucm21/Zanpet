@@ -52,7 +52,7 @@ public class VpnService : global::Android.Net.VpnService
         return _vpnInterface!;
     }
 
-    public bool Protect(int fd)
+    public new bool Protect(int fd)
     {
         return base.Protect(fd);
     }
