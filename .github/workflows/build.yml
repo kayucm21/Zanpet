@@ -7,17 +7,23 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      DOTNET_NUGET_SIGNATURE_VERIFICATION: 'false'
     steps:
     - uses: actions/checkout@v4
 
+    - uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
     - name: Workloads
-      run: dotnet workload install maui
+      run: dotnet workload install maui --ignore-failed-sources
 
     - name: Restore
       run: dotnet restore "mobile/ZapretUI Mobile.csproj"
 
     - name: Publish
-      run: dotnet publish "mobile/ZapretUI Mobile.csproj" -f net10.0-android -c Release -r android-arm64 -o ./artifacts
+      run: dotnet publish "mobile/ZapretUI Mobile.csproj" -f net9.0-android -c Release -r android-arm64 -o ./artifacts
 
     - name: Upload
       uses: actions/upload-artifact@v4
