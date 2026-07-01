@@ -1,11 +1,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Text;
 using System.Text.Json;
 using Android.App;
-using Android.Content;
-using Android.Net;
-using Android.OS;
 using ZapretUI_Mobile.Models;
 
 namespace ZapretUI_Mobile.Services;
@@ -13,10 +9,8 @@ namespace ZapretUI_Mobile.Services;
 public class XrayService
 {
     private Process? _xrayProcess;
-    private global::Android.Net.VpnService? _vpnService;
     private string _xrayPath = string.Empty;
     private string _configPath = string.Empty;
-    private ParcelFileDescriptor? _vpnInterface;
 
     public bool IsRunning => _xrayProcess != null && !_xrayProcess.HasExited;
 
@@ -26,7 +20,6 @@ public class XrayService
         {
             await CopyXrayBinaryAsync();
             GenerateConfig(server);
-            StartVpn();
             await StartXrayProcessAsync();
             return true;
         }
@@ -40,7 +33,6 @@ public class XrayService
     public async Task StopAsync()
     {
         StopXrayProcess();
-        StopVpn();
         await Task.CompletedTask;
     }
 
@@ -63,7 +55,6 @@ public class XrayService
             using var outputStream = File.Create(_xrayPath);
             await inputStream.CopyToAsync(outputStream);
 
-            // Make executable on Unix-like systems
             try
             {
                 var process = Process.Start(new ProcessStartInfo
@@ -77,7 +68,6 @@ public class XrayService
             }
             catch
             {
-                // chmod may not be available, continue
             }
         }
         catch (Exception ex)
@@ -208,34 +198,6 @@ public class XrayService
         File.WriteAllText(_configPath, json);
     }
 
-    private void StartVpn()
-    {
-        var intent = VpnService.Prepare(Android.App.Application.Context);
-        if (intent != null)
-        {
-            // User needs to grant VPN permission
-            // In a real app, you'd launch this intent
-            throw new InvalidOperationException("VPN permission required");
-        }
-
-        var builder = new VpnService.Builder()
-            .SetSession("Zapret VPN")
-            .AddAddress("10.0.0.2", 32)
-            .AddRoute("0.0.0.0", 0)
-            .AddDnsServer("8.8.8.8")
-            .AddDnsServer("8.8.4.4")
-            .SetMtu(1500)
-            .SetBlocking(true);
-
-        _vpnInterface = builder.Establish();
-    }
-
-    private void StopVpn()
-    {
-        _vpnInterface?.Close();
-        _vpnInterface = null;
-    }
-
     private async Task StartXrayProcessAsync()
     {
         var psi = new ProcessStartInfo
@@ -252,7 +214,6 @@ public class XrayService
         _xrayProcess = new Process { StartInfo = psi };
         _xrayProcess.Start();
 
-        // Read output asynchronously
         _ = Task.Run(async () =>
         {
             while (!_xrayProcess.StandardOutput.EndOfStream)

@@ -8,7 +8,7 @@ namespace ZapretUI_Mobile;
 [IntentFilter(new[] { "android.net.VpnService" })]
 public class VpnService : global::Android.Net.VpnService
 {
-    private ParcelFileDescriptor? _vpnInterface;
+    private global::Android.OS.ParcelFileDescriptor? _vpnInterface;
     private NotificationManager? _notificationManager;
     private const int NOTIFICATION_ID = 1;
     private const string CHANNEL_ID = "zapret_vpn";
@@ -46,20 +46,10 @@ public class VpnService : global::Android.Net.VpnService
         base.OnRevoke();
     }
 
-    public ParcelFileDescriptor Establish(VpnService.Builder builder)
+    public global::Android.OS.ParcelFileDescriptor Establish(global::Android.Net.VpnService.Builder builder)
     {
         _vpnInterface = builder.Establish();
         return _vpnInterface!;
-    }
-
-    public new bool Protect(int fd)
-    {
-        return base.Protect(fd);
-    }
-
-    public bool Protect(System.Net.Sockets.Socket socket)
-    {
-        return base.Protect(socket);
     }
 
     private void StopVpn()
