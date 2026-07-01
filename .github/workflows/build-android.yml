@@ -11,22 +11,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '9.0.x'
-
-    - name: Install workloads
+    - name: Install MAUI workload
       run: dotnet workload install maui
 
-    - name: Restore
-      run: dotnet restore "mobile/ZapretUI Mobile.csproj"
-
     - name: Publish
-      run: dotnet publish "mobile/ZapretUI Mobile.csproj" -f net9.0-android -c Release -r android-arm64 -o ./artifacts
+      run: dotnet publish "mobile/ZapretUI Mobile.csproj" -f net10.0-android -c Release -r android-arm64 -o ./artifacts
 
     - name: Upload
-      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: zapret-apk
-        path: ./artifacts/*
+        path: ./artifacts/*.apk

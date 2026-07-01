@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net9.0-android</TargetFrameworks>
+    <TargetFrameworks>net10.0-android</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <RootNamespace>ZapretUI_Mobile</RootNamespace>
     <UseMaui>true</UseMaui>
@@ -13,7 +13,7 @@
     <ApplicationVersion>1</ApplicationVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">26</SupportedOSPlatformVersion>
     <SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
-    <NoWarn>CA1422;CA1416;CA2024;CS8602;CS8600;CS8601;CS8603;CS8604</NoWarn>
+    <NoWarn>CA1422;CA1416;CA2024;CS8602;CS8600;CS8601;CS8603;CS8604;NETSDK1202</NoWarn>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
@@ -27,7 +27,6 @@
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-    <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.60" />
   </ItemGroup>
 
   <ItemGroup>
