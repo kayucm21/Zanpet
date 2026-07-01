@@ -451,13 +451,13 @@ public sealed class VpnService : IDisposable
                 if (key is not null)
                 {
                     key.SetValue("ProxyEnable", 1, Microsoft.Win32.RegistryValueKind.DWord);
-                    key.SetValue("ProxyServer", $"http={host}:{httpPort}", Microsoft.Win32.RegistryValueKind.String);
+                    key.SetValue("ProxyServer", $"http={host}:{httpPort};https={host}:{httpPort}", Microsoft.Win32.RegistryValueKind.String);
                     key.SetValue("ProxyOverride", proxyOverride, Microsoft.Win32.RegistryValueKind.String);
                 }
             }
 
             // 2) WinHTTP (for apps that use WinHTTP instead of WinINet)
-            RunCmd("netsh", $"winhttp set proxy proxy-server=\"http={host}:{httpPort}\" bypass-list=\"{proxyOverride.Replace(";", " ")}\"");
+            RunCmd("netsh", $"winhttp set proxy proxy-server=\"http={host}:{httpPort};https={host}:{httpPort}\" bypass-list=\"{proxyOverride.Replace(";", " ")}\"");
 
             // 3) Notify all running apps (INTERNET_OPTION_SETTINGS_CHANGED + INTERNET_OPTION_REFRESH)
             InternetSetOption(0, 39, IntPtr.Zero, 0);
