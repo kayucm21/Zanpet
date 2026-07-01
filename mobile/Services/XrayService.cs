@@ -215,20 +215,22 @@ public class XrayService
 
         _ = Task.Run(async () =>
         {
-            while (!_xrayProcess.StandardOutput.EndOfStream)
+            while (true)
             {
                 var line = await _xrayProcess.StandardOutput.ReadLineAsync();
-                if (!string.IsNullOrEmpty(line))
+                if (line == null) break;
+                if (line.Length > 0)
                     System.Diagnostics.Debug.WriteLine($"[XRAY] {line}");
             }
         });
 
         _ = Task.Run(async () =>
         {
-            while (!_xrayProcess.StandardError.EndOfStream)
+            while (true)
             {
                 var line = await _xrayProcess.StandardError.ReadLineAsync();
-                if (!string.IsNullOrEmpty(line))
+                if (line == null) break;
+                if (line.Length > 0)
                     System.Diagnostics.Debug.WriteLine($"[XRAY ERR] {line}");
             }
         });

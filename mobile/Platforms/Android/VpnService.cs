@@ -85,13 +85,9 @@ public class VpnService : global::Android.Net.VpnService
             .SetContentTitle("Zapret VPN")
             .SetContentText("VPN is active")
             .SetSmallIcon(global::Android.Resource.Drawable.IcMenuManage)
+            .SetChannelId(CHANNEL_ID)
             .SetOngoing(true)
-            .AddAction(global::Android.Resource.Drawable.IcMenuCloseClearCancel, "Stop", stopPendingIntent);
-
-        if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
-        {
-            builder.SetChannelId(CHANNEL_ID);
-        }
+            .AddAction(global::Android.Resource.Drawable.IcMenuCloseClearCancel, "Stop", stopPendingIntent!);
 
         return builder.Build()!;
     }
