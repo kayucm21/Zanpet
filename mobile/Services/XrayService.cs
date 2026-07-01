@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.Json;
-using Android.App;
 using ZapretUI_Mobile.Models;
 
 namespace ZapretUI_Mobile.Services;
@@ -38,7 +37,7 @@ public class XrayService
 
     private async Task CopyXrayBinaryAsync()
     {
-        var cacheDir = Application.Context.CacheDir?.AbsolutePath ?? 
+        var cacheDir = global::Android.App.Application.Context.CacheDir?.AbsolutePath ?? 
             throw new InvalidOperationException("Cannot access cache directory");
 
         _xrayPath = Path.Combine(cacheDir, "xray");
@@ -48,7 +47,7 @@ public class XrayService
 
         try
         {
-            using var inputStream = Application.Context.Assets?.Open("xray");
+            using var inputStream = global::Android.App.Application.Context.Assets?.Open("xray");
             if (inputStream == null)
                 throw new FileNotFoundException("xray binary not found in assets");
 
@@ -78,7 +77,7 @@ public class XrayService
 
     private void GenerateConfig(VpnServer server)
     {
-        var cacheDir = Application.Context.CacheDir?.AbsolutePath ?? 
+        var cacheDir = global::Android.App.Application.Context.CacheDir?.AbsolutePath ?? 
             throw new InvalidOperationException("Cannot access cache directory");
 
         _configPath = Path.Combine(cacheDir, "config.json");
