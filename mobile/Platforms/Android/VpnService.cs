@@ -1,13 +1,12 @@
 using Android.App;
 using Android.Content;
-using Android.Net;
 using Android.OS;
 
 namespace ZapretUI_Mobile;
 
 [Service(Name = "com.zapret.vpn.VpnService", Permission = "android.permission.BIND_VPN_SERVICE", Exported = false)]
 [IntentFilter(new[] { "android.net.VpnService" })]
-public class VpnService : Android.VPN.VpnService
+public class VpnService : global::Android.Net.VpnService
 {
     private ParcelFileDescriptor? _vpnInterface;
     private NotificationManager? _notificationManager;

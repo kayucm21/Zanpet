@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -11,7 +12,7 @@ namespace ZapretUI_Mobile.Services;
 public class XrayService
 {
     private Process? _xrayProcess;
-    private Android.VPN.VpnService? _vpnService;
+    private global::Android.Net.VpnService? _vpnService;
     private string _xrayPath = string.Empty;
     private string _configPath = string.Empty;
     private ParcelFileDescriptor? _vpnInterface;
@@ -91,10 +92,23 @@ public class XrayService
 
         _configPath = Path.Combine(cacheDir, "config.json");
 
-        var networkSettings = new object();
+        var streamSettings = new Dictionary<string, object>
+        {
+            ["network"] = server.Network,
+            ["security"] = server.Security,
+            ["realitySettings"] = new
+            {
+                serverName = server.Sni,
+                fingerprint = server.Fingerprint,
+                publicKey = server.PublicKey,
+                shortId = server.ShortId,
+                serverNames = new[] { server.Sni }
+            }
+        };
+
         if (server.Network == "xhttp")
         {
-            networkSettings = new
+            streamSettings["xhttpSettings"] = new
             {
                 path = server.Path,
                 mode = server.Mode
@@ -160,23 +174,7 @@ public class XrayService
                             }
                         }
                     },
-                    streamSettings = new
-                    {
-                        network = server.Network,
-                        security = server.Security,
-                        realitySettings = new
-                        {
-                            serverName = server.Sni,
-                            fingerprint = server.Fingerprint,
-                            publicKey = server.PublicKey,
-                            shortId = server.ShortId,
-                            serverNames = new[] { server.Sni }
-                        },
-                        ...(server.Network == "xhttp" ? new
-                        {
-                            xhttpSettings = networkSettings
-                        } : new object())
-                    }
+                    streamSettings = streamSettings
                 },
                 new
                 {
