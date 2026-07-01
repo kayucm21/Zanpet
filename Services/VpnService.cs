@@ -96,6 +96,8 @@ public sealed class VpnService : IDisposable
                 Network = ps["type"] ?? "tcp",
                 Host = ps["host"] ?? ps["ahost"] ?? "",
                 Spx = Uri.UnescapeDataString(ps["spx"] ?? ""),
+                Path = Uri.UnescapeDataString(ps["path"] ?? ""),
+                Mode = ps["mode"] ?? "",
                 RawUri = uri,
             };
         }
@@ -337,9 +339,16 @@ public sealed class VpnService : IDisposable
         else if (server.Network == "xhttp")
         {
             sb.AppendLine("        ,\"xhttpSettings\": {");
-            sb.AppendLine("          \"mode\": \"auto\"");
-            if (!string.IsNullOrEmpty(server.Spx))
-                sb.AppendLine($"          ,\"path\": \"{Esc(server.Spx)}\"");
+            string mode = !string.IsNullOrEmpty(server.Mode) ? server.Mode : "auto";
+            sb.AppendLine($"          \"mode\": \"{Esc(mode)}\"");
+
+            // Path: prefer Spx if meaningful, otherwise fall back to Path
+            string xPath = server.Spx;
+            if (string.IsNullOrEmpty(xPath) || xPath == "/")
+                xPath = server.Path;
+            if (!string.IsNullOrEmpty(xPath))
+                sb.AppendLine($"          ,\"path\": \"{Esc(xPath)}\"");
+
             string host = !string.IsNullOrEmpty(server.Host) ? server.Host : server.Sni;
             if (!string.IsNullOrEmpty(host))
                 sb.AppendLine($"          ,\"host\": \"{Esc(host)}\"");
