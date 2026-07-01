@@ -1,0 +1,52 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+<?xaml-comp compile="true" ?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    x:Class="ZapretUI_Mobile.Resources.Styles.Styles">
+
+    <Style TargetType="Page" ApplyToDerivedTypes="True">
+        <Setter Property="BackgroundColor" Value="{StaticResource Background}" />
+    </Style>
+
+    <Style TargetType="ContentPage">
+        <Setter Property="BackgroundColor" Value="{StaticResource Background}" />
+    </Style>
+
+    <Style TargetType="Label">
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+    </Style>
+
+    <Style TargetType="Picker">
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource Surface}" />
+        <Setter Property="TitleColor" Value="{StaticResource TextSecondary}" />
+        <Setter Property="FontFamily" Value="OpenSansRegular" />
+        <Setter Property="FontSize" Value="16" />
+    </Style>
+
+    <Style TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+        <Setter Property="TextColor" Value="{StaticResource OnPrimary}" />
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="HeightRequest" Value="50" />
+    </Style>
+
+    <Style TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}" />
+        <Setter Property="Stroke" Value="{StaticResource CardBorder}" />
+        <Setter Property="StrokeThickness" Value="1" />
+    </Style>
+
+    <Style TargetType="ScrollView">
+        <Setter Property="BackgroundColor" Value="{StaticResource Background}" />
+    </Style>
+
+    <Style TargetType="Frame">
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}" />
+        <Setter Property="BorderColor" Value="{StaticResource CardBorder}" />
+        <Setter Property="CornerRadius" Value="10" />
+    </Style>
+</ResourceDictionary>

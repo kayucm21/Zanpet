@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:ZapretUI_Mobile.ViewModels"
+             x:Class="ZapretUI_Mobile.MainPage"
+             Title="Zapret"
+             BackgroundColor="#1a1a2e">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Padding="20" RowSpacing="15">
+
+        <!-- Logo -->
+        <Label Grid.Row="0"
+               Text="Zapret"
+               FontSize="36"
+               FontAttributes="Bold"
+               TextColor="#6c63ff"
+               HorizontalOptions="Center" />
+
+        <Label Grid.Row="1"
+               Text="DPI Bypass"
+               FontSize="16"
+               TextColor="#8888aa"
+               HorizontalOptions="Center"
+               Margin="0,0,0,10" />
+
+        <!-- Server Selector -->
+        <Picker Grid.Row="2"
+                x:Name="ServerPicker"
+                Title="Select Server"
+                BackgroundColor="#16213e"
+                TextColor="White"
+                TitleColor="#8888aa"
+                SelectedItem="{Binding SelectedServer}"
+                ItemsSource="{Binding Servers}"
+                HorizontalOptions="Fill"
+                HeightRequest="50"
+                FontSize="16" />
+
+        <!-- Toggle Button -->
+        <Grid Grid.Row="3" VerticalOptions="Center" HorizontalOptions="Center">
+            <Ellipse WidthRequest="160" HeightRequest="160"
+                     Stroke="{Binding IsConnected, Converter={StaticResource StatusColorConverter}}"
+                     StrokeThickness="4"
+                     Fill="Transparent" />
+            <Ellipse WidthRequest="140" HeightRequest="140"
+                     Fill="{Binding IsConnected, Converter={StaticResource StatusBgConverter}}" />
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="5">
+                <Label Text="{Binding ToggleIcon}"
+                       FontSize="40"
+                       TextColor="White"
+                       HorizontalOptions="Center" />
+                <Label Text="{Binding ToggleText}"
+                       FontSize="14"
+                       TextColor="White"
+                       HorizontalOptions="Center" />
+            </VerticalStackLayout>
+        </Grid>
+
+        <!-- Tap Gesture -->
+        <Grid.GestureRecognizers>
+            <TapGestureRecognizer Command="{Binding ToggleConnectionCommand}" />
+        </Grid.GestureRecognizers>
+
+        <!-- Status -->
+        <Label Grid.Row="3"
+               Text="{Binding StatusText}"
+               FontSize="14"
+               TextColor="{Binding StatusColor}"
+               HorizontalOptions="Center"
+               VerticalOptions="End"
+               Margin="0,0,0,20" />
+
+        <!-- Log Viewer -->
+        <Border Grid.Row="4"
+                BackgroundColor="#16213e"
+                StrokeShape="RoundRectangle 10"
+                Padding="10"
+                HeightRequest="200">
+            <ScrollView x:Name="LogScroll">
+                <Label x:Name="LogLabel"
+                       Text="{Binding LogText}"
+                       FontSize="11"
+                       FontFamily="Courier New"
+                       TextColor="#00ff88"
+                       LineBreakMode="Wrap" />
+            </ScrollView>
+        </Border>
+
+    </Grid>
+</ContentPage>

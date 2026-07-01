@@ -1,0 +1,26 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+<?xaml-comp compile="true" ?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    x:Class="ZapretUI_Mobile.Resources.Styles.Colors">
+
+    <Color x:Key="Primary">#6c63ff</Color>
+    <Color x:Key="PrimaryDark">#5a52d5</Color>
+    <Color x:Key="PrimaryLight">#8b83ff</Color>
+    <Color x:Key="Secondary">#16213e</Color>
+    <Color x:Key="Background">#1a1a2e</Color>
+    <Color x:Key="Surface">#16213e</Color>
+    <Color x:Key="OnPrimary">White</Color>
+    <Color x:Key="OnBackground">White</Color>
+    <Color x:Key="OnSurface">White</Color>
+    <Color x:Key="TextPrimary">White</Color>
+    <Color x:Key="TextSecondary">#8888aa</Color>
+    <Color x:Key="Success">#00ff88</Color>
+    <Color x:Key="Error">#ff4444</Color>
+    <Color x:Key="Warning">#ffaa00</Color>
+    <Color x:Key="LogForeground">#00ff88</Color>
+    <Color x:Key="LogBackground">#16213e</Color>
+    <Color x:Key="CardBackground">#16213e</Color>
+    <Color x:Key="CardBorder">#6c63ff</Color>
+</ResourceDictionary>
