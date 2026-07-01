@@ -1,10 +1,8 @@
-name: Build Android APK
+name: build
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build:
@@ -12,8 +10,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install MAUI workload
+    - name: Workloads
       run: dotnet workload install maui
+
+    - name: Restore
+      run: dotnet restore "mobile/ZapretUI Mobile.csproj"
 
     - name: Publish
       run: dotnet publish "mobile/ZapretUI Mobile.csproj" -f net10.0-android -c Release -r android-arm64 -o ./artifacts
@@ -21,5 +22,5 @@ jobs:
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
-        name: zapret-apk
+        name: zapret
         path: ./artifacts/*.apk
