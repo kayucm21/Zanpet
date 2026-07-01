@@ -172,6 +172,8 @@ public sealed class UpdaterService
                 CreateNoWindow = true,
             });
 
+            // Give the bat file time to start before killing this process
+            await Task.Delay(1000);
             Environment.Exit(0);
         }
         catch
