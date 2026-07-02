@@ -7,6 +7,8 @@
         <ResourceDictionary>
             <converters:StatusColorConverter x:Key="StatusColorConverter" />
             <converters:StatusBgConverter x:Key="StatusBgConverter" />
+            <converters:PresetBorderConverter x:Key="PresetBorderConverter" />
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />

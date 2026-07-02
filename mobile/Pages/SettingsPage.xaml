@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="ZapretUI_Mobile.Pages.SettingsPage"
+             Title="Настройки"
+             BackgroundColor="#090C11">
+
+    <ScrollView>
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" Padding="16" RowSpacing="12">
+
+            <!-- Header -->
+            <Label Grid.Row="0"
+                   Text="Настройки"
+                   FontSize="22"
+                   FontAttributes="Bold"
+                   TextColor="White"
+                   Margin="4,0" />
+
+            <!-- Engine Update -->
+            <Border Grid.Row="1"
+                    BackgroundColor="#11161F"
+                    Stroke="#1E293B"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 14"
+                    Padding="16">
+                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+                    <Label Text="Движок"
+                           FontSize="16" FontAttributes="Bold" TextColor="White" />
+                    <Label Text="{Binding EngineVersionText}"
+                           FontSize="13" TextColor="#8888AA" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <Label Grid.Column="0"
+                               Text="{Binding UpdateStatus}"
+                               FontSize="12" TextColor="#34D399"
+                               VerticalOptions="Center" />
+                        <Button Grid.Column="1"
+                                Text="Проверить обновления"
+                                Command="{Binding CheckUpdateCommand}"
+                                BackgroundColor="#60A5FA"
+                                TextColor="#090C11"
+                                FontSize="12"
+                                CornerRadius="8"
+                                HeightRequest="34" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- Autostart -->
+            <Border Grid.Row="2"
+                    BackgroundColor="#11161F"
+                    Stroke="#1E293B"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 14"
+                    Padding="16">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="Автозапуск"
+                               FontSize="15" TextColor="White" />
+                        <Label Text="Запускать обход при включении устройства"
+                               FontSize="12" TextColor="#555566" />
+                    </VerticalStackLayout>
+                    <Switch Grid.Column="1"
+                            IsToggled="{Binding AutostartEnabled}"
+                            ThumbColor="White"
+                            OnColor="#60A5FA"
+                            VerticalOptions="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Auto-Heal -->
+            <Border Grid.Row="3"
+                    BackgroundColor="#11161F"
+                    Stroke="#1E293B"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 14"
+                    Padding="16">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="Авто-починка"
+                               FontSize="15" TextColor="White" />
+                        <Label Text="Автоматически перезапускать при потере работоспособности"
+                               FontSize="12" TextColor="#555566" />
+                    </VerticalStackLayout>
+                    <Switch Grid.Column="1"
+                            IsToggled="{Binding AutoHeal}"
+                            ThumbColor="White"
+                            OnColor="#60A5FA"
+                            VerticalOptions="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Bypass All Sites -->
+            <Border Grid.Row="4"
+                    BackgroundColor="#11161F"
+                    Stroke="#1E293B"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 14"
+                    Padding="16">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="Область обхода"
+                               FontSize="15" TextColor="White" />
+                        <Label Text="Обходить все сайты или только заблокированные"
+                               FontSize="12" TextColor="#555566" />
+                    </VerticalStackLayout>
+                    <Switch Grid.Column="1"
+                            IsToggled="{Binding BypassAllSites}"
+                            ThumbColor="White"
+                            OnColor="#60A5FA"
+                            VerticalOptions="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Game Filter -->
+            <Border Grid.Row="5"
+                    BackgroundColor="#11161F"
+                    Stroke="#1E293B"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 14"
+                    Padding="16">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="Игровой фильтр"
+                               FontSize="15" TextColor="White" />
+                        <Label Text="Обходить порты игр (>1023)"
+                               FontSize="12" TextColor="#555566" />
+                    </VerticalStackLayout>
+                    <Switch Grid.Column="1"
+                            IsToggled="{Binding GameFilter}"
+                            ThumbColor="White"
+                            OnColor="#60A5FA"
+                            VerticalOptions="Center" />
+                </Grid>
+            </Border>
+
+            <!-- About -->
+            <Border Grid.Row="6"
+                    BackgroundColor="#11161F"
+                    Stroke="#1E293B"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 14"
+                    Padding="16">
+                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
+                    <Label Text="Zapret"
+                           FontSize="16" FontAttributes="Bold" TextColor="White" />
+                    <Label Text="{Binding AppVersion}"
+                           FontSize="13" TextColor="#60A5FA" />
+                    <Label Text="DPI Bypass для Android"
+                           FontSize="12" TextColor="#555566" />
+                </Grid>
+            </Border>
+
+        </Grid>
+    </ScrollView>
+</ContentPage>

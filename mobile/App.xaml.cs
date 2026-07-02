@@ -1,22 +1,25 @@
-using Microsoft.Extensions.Logging;
 using ZapretUI_Mobile.Services;
 using ZapretUI_Mobile.ViewModels;
+using ZapretUI_Mobile.Pages;
 
 namespace ZapretUI_Mobile;
 
 public partial class App : Application
 {
-    private readonly MainPageViewModel _viewModel;
-
-    public App(MainPageViewModel viewModel)
+    public App()
     {
         InitializeComponent();
-        _viewModel = viewModel;
     }
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        var page = new MainPage(_viewModel);
-        return new Window(page);
+        if (activationState?.Context.Services is { } services)
+        {
+            var tabbed = services.GetRequiredService<MainTabbedPage>();
+            return new Window(tabbed);
+        }
+        // Fallback (shouldn't happen)
+        var vm = new MainPageViewModel(new XrayService());
+        return new Window(new MainTabbedPage(vm));
     }
 }

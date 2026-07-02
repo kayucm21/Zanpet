@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:ZapretUI_Mobile.Models"
+             x:Class="ZapretUI_Mobile.Pages.VpnPage"
+             Title="VPN"
+             BackgroundColor="#090C11">
+
+    <ScrollView>
+        <Grid RowDefinitions="Auto,Auto,Auto" Padding="16" RowSpacing="16">
+
+            <!-- Header -->
+            <Label Grid.Row="0"
+                   Text="VPN"
+                   FontSize="22"
+                   FontAttributes="Bold"
+                   TextColor="White"
+                   Margin="4,0" />
+
+            <!-- Xray Status -->
+            <Border Grid.Row="1"
+                    BackgroundColor="#11161F"
+                    Stroke="#1E293B"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 14"
+                    Padding="16">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <VerticalStackLayout Grid.Column="0" Spacing="4">
+                        <Label Text="Xray Core"
+                               FontSize="16" FontAttributes="Bold" TextColor="White" />
+                        <Label Text="{Binding VpnXrayStatus}"
+                               FontSize="12" TextColor="#8888AA" />
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1"
+                            Text="Скачать"
+                            Command="{Binding VpnDownloadXrayCommand}"
+                            BackgroundColor="#60A5FA"
+                            TextColor="#090C11"
+                            FontSize="13"
+                            CornerRadius="8"
+                            HeightRequest="36"
+                            IsVisible="{Binding IsVpnDownloadVisible}" />
+                </Grid>
+            </Border>
+
+            <!-- Server List -->
+            <VerticalStackLayout Grid.Row="2" Spacing="8">
+                <Grid ColumnDefinitions="*,Auto" Margin="4,0">
+                    <Label Text="Доступные серверы"
+                           FontSize="16" FontAttributes="Bold" TextColor="White" VerticalOptions="Center" />
+                    <Button Grid.Column="1"
+                            Text="Обновить"
+                            Command="{Binding VpnRefreshCommand}"
+                            BackgroundColor="#1E293B"
+                            TextColor="#60A5FA"
+                            FontSize="12"
+                            CornerRadius="8"
+                            HeightRequest="32" />
+                </Grid>
+
+                <CollectionView ItemsSource="{Binding VpnServers}"
+                                SelectionMode="None"
+                                HeightRequest="300">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="models:VpnServer">
+                            <Border BackgroundColor="#11161F"
+                                    Stroke="#1E293B"
+                                    StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 12"
+                                    Padding="14,12"
+                                    Margin="0,2">
+                                <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4">
+                                    <!-- Row 0: Name + Ping -->
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <Label Grid.Column="0"
+                                               Text="{Binding Name}"
+                                               FontSize="15"
+                                               FontAttributes="Bold"
+                                               TextColor="White" />
+                                        <Label Grid.Column="1"
+                                               Text="{Binding PingText}"
+                                               FontSize="12"
+                                               TextColor="{Binding PingColor}"
+                                               VerticalOptions="Center" />
+                                    </Grid>
+
+                                    <!-- Row 1: Details -->
+                                    <Label Grid.Row="1"
+                                           Text="{Binding DetailsText}"
+                                           FontSize="12"
+                                           TextColor="#8888AA"
+                                           LineBreakMode="TailTruncation" />
+
+                                    <!-- Row 2: Tags -->
+                                    <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
+                                        <Border BackgroundColor="#1E293B"
+                                                Stroke="Transparent"
+                                                StrokeShape="RoundRectangle 6"
+                                                Padding="6,2">
+                                            <Label Text="{Binding Network}"
+                                                   FontSize="10" TextColor="#60A5FA" />
+                                        </Border>
+                                        <Border Grid.Column="1" BackgroundColor="#1E293B"
+                                                Stroke="Transparent"
+                                                StrokeShape="RoundRectangle 6"
+                                                Padding="6,2">
+                                            <Label Text="{Binding Security}"
+                                                   FontSize="10" TextColor="#34D399" />
+                                        </Border>
+                                        <Border Grid.Column="2" BackgroundColor="#1E293B"
+                                                Stroke="Transparent"
+                                                StrokeShape="RoundRectangle 6"
+                                                Padding="6,2">
+                                            <Label Text="{Binding AddressPort}"
+                                                   FontSize="10" TextColor="#8888AA" />
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- Row 3: Connect Button -->
+                                    <Button Grid.Row="3"
+                                            Text="{Binding ConnectButtonText}"
+                                            BackgroundColor="{Binding ConnectButtonBg}"
+                                            TextColor="White"
+                                            FontSize="13"
+                                            CornerRadius="8"
+                                            HeightRequest="38"
+                                            Clicked="OnVpnConnectClicked"
+                                            Margin="0,4,0,0" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+
+        </Grid>
+    </ScrollView>
+</ContentPage>

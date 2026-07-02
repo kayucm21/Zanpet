@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<TabbedPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+            xmlns:pages="clr-namespace:ZapretUI_Mobile.Pages"
+            x:Class="ZapretUI_Mobile.MainTabbedPage"
+            BackgroundColor="#090C11"
+            BarBackgroundColor="#0D1117"
+            BarTextColor="#60A5FA"
+            UnselectedTabColor="#555566"
+            SelectedTabColor="#60A5FA">
+
+    <TabbedPage.Children>
+        <pages:HomePage Title="Главная" Icon="{OnPlatform iOS='house.fill'}" />
+        <pages:StrategiesPage Title="Стратегии" Icon="{OnPlatform iOS='list.bullet'}" />
+        <pages:VpnPage Title="VPN" Icon="{OnPlatform iOS='lock.fill'}" />
+        <pages:SettingsPage Title="Настройки" Icon="{OnPlatform iOS='gearshape.fill'}" />
+        <pages:LogPage Title="Журнал" Icon="{OnPlatform iOS='doc.text.fill'}" />
+    </TabbedPage.Children>
+</TabbedPage>

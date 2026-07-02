@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="ZapretUI_Mobile.Pages.StrategiesPage"
+             Title="Стратегии"
+             BackgroundColor="#090C11">
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="16" RowSpacing="12">
+
+        <!-- Header -->
+        <Label Grid.Row="0"
+               Text="Стратегии"
+               FontSize="22"
+               FontAttributes="Bold"
+               TextColor="White"
+               Margin="4,0" />
+
+        <!-- Preset List -->
+        <CollectionView Grid.Row="1"
+                        x:Name="PresetCollectionView"
+                        SelectionMode="Single"
+                        SelectedItem="{Binding SelectedPreset}"
+                        BackgroundColor="Transparent">
+            <CollectionView.GroupHeaderTemplate>
+                <DataTemplate>
+                    <Label Text="{Binding Title}"
+                           FontSize="13"
+                           TextColor="#555566"
+                           FontAttributes="Bold"
+                           Margin="4,12,4,6"
+                           TextTransform="Uppercase" />
+                </DataTemplate>
+            </CollectionView.GroupHeaderTemplate>
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Border BackgroundColor="#11161F"
+                            Stroke="{Binding IsSelected, Converter={StaticResource PresetBorderConverter}}"
+                            StrokeThickness="1"
+                            StrokeShape="RoundRectangle 12"
+                            Padding="14,12"
+                            Margin="0,2">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" RowSpacing="4">
+                            <Label Grid.Row="0" Grid.Column="0"
+                                   Text="{Binding Name}"
+                                   FontSize="15"
+                                   FontAttributes="Bold"
+                                   TextColor="White" />
+                            <Label Grid.Row="0" Grid.Column="1"
+                                   Text="{Binding Badge}"
+                                   FontSize="11"
+                                   TextColor="#090C11"
+                                   BackgroundColor="#34D399"
+                                   Padding="8,2"
+                                   VerticalOptions="Center"
+                                   IsVisible="{Binding HasBadge}" />
+                            <Label Grid.Row="1" Grid.Column="0"
+                                   Text="{Binding Description}"
+                                   FontSize="12"
+                                   TextColor="#8888AA"
+                                   LineBreakMode="TailTruncation"
+                                   MaxLines="2" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Action Buttons -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,*,*" ColumnSpacing="8">
+            <Button Grid.Column="0"
+                    Text="Дублировать"
+                    Command="{Binding DuplicatePresetCommand}"
+                    BackgroundColor="#1E293B"
+                    TextColor="#60A5FA"
+                    FontSize="13"
+                    CornerRadius="10"
+                    HeightRequest="44" />
+            <Button Grid.Column="1"
+                    Text="Сохранить"
+                    Command="{Binding SavePresetCommand}"
+                    BackgroundColor="#1E293B"
+                    TextColor="#34D399"
+                    FontSize="13"
+                    CornerRadius="10"
+                    HeightRequest="44" />
+            <Button Grid.Column="2"
+                    Text="Удалить"
+                    Command="{Binding DeletePresetCommand}"
+                    BackgroundColor="#1E293B"
+                    TextColor="#E2566A"
+                    FontSize="13"
+                    CornerRadius="10"
+                    HeightRequest="44" />
+        </Grid>
+
+    </Grid>
+</ContentPage>

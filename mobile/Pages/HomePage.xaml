@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="ZapretUI_Mobile.Pages.HomePage"
+             Title="Главная"
+             BackgroundColor="#090C11">
+
+    <ScrollView>
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" Padding="20" RowSpacing="20">
+
+            <!-- Header -->
+            <Label Grid.Row="0"
+                   Text="Zapret"
+                   FontSize="32"
+                   FontAttributes="Bold"
+                   TextColor="#60A5FA"
+                   HorizontalOptions="Center" />
+
+            <Label Grid.Row="0"
+                   Text="DPI Bypass v1.0"
+                   FontSize="14"
+                   TextColor="#555566"
+                   HorizontalOptions="Center"
+                   Margin="0,36,0,0" />
+
+            <!-- Status Card -->
+            <Border Grid.Row="1"
+                    BackgroundColor="#11161F"
+                    Stroke="#1E293B"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 14"
+                    Padding="20">
+                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <Ellipse Grid.Column="0"
+                                 WidthRequest="12" HeightRequest="12"
+                                 Fill="{Binding StatusDotColor}" VerticalOptions="Center" />
+                        <Label Grid.Column="1"
+                               Text="{Binding StatusText}"
+                               FontSize="18"
+                               FontAttributes="Bold"
+                               TextColor="White" VerticalOptions="Center" />
+                    </Grid>
+                    <Label Grid.Row="1"
+                           Text="{Binding StatusTitle}"
+                           FontSize="28"
+                           FontAttributes="Bold"
+                           TextColor="{Binding StatusTitleColor}" />
+                    <Label Grid.Row="2"
+                           Text="{Binding SimpleStatus}"
+                           FontSize="13"
+                           TextColor="#8888AA" />
+                </Grid>
+            </Border>
+
+            <!-- Toggle Button -->
+            <Border Grid.Row="2"
+                    BackgroundColor="{Binding ToggleBgColor}"
+                    Stroke="{Binding ToggleBorderColor}"
+                    StrokeThickness="2"
+                    StrokeShape="RoundRectangle 14"
+                    HeightRequest="64"
+                    Padding="0">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding ToggleCommand}" />
+                </Border.GestureRecognizers>
+                <Grid ColumnDefinitions="Auto,*,Auto" Padding="20,0">
+                    <Label Grid.Column="0"
+                           Text="{Binding ToggleIcon}"
+                           FontSize="22"
+                           TextColor="White"
+                           VerticalOptions="Center" />
+                    <Label Grid.Column="1"
+                           Text="{Binding ToggleText}"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           TextColor="White"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center" />
+                    <Label Grid.Column="2"
+                           Text="{Binding ToggleArrow}"
+                           FontSize="18"
+                           TextColor="White"
+                           VerticalOptions="Center" />
+                </Grid>
+            </Border>
+
+            <!-- VPN Info -->
+            <Border Grid.Row="3"
+                    BackgroundColor="#11161F"
+                    Stroke="#1E293B"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 14"
+                    Padding="16"
+                    IsVisible="{Binding IsVpnConnected}">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <Ellipse Grid.Column="0"
+                             WidthRequest="10" HeightRequest="10"
+                             Fill="#34D399" VerticalOptions="Center" />
+                    <Label Grid.Column="1"
+                           Text="{Binding VpnConnectedInfo}"
+                           FontSize="14"
+                           TextColor="#34D399"
+                           VerticalOptions="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Active Preset -->
+            <Border Grid.Row="4"
+                    BackgroundColor="#11161F"
+                    Stroke="#1E293B"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 14"
+                    Padding="16"
+                    IsVisible="{Binding HasRunningPreset}">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="Активная стратегия"
+                               FontSize="12" TextColor="#555566" />
+                        <Label Text="{Binding RunningPresetName}"
+                               FontSize="15" TextColor="#60A5FA"
+                               FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                    <Label Grid.Column="1"
+                           Text="ВКЛ"
+                           FontSize="12"
+                           TextColor="#090C11"
+                           BackgroundColor="#34D399"
+                           Padding="8,3"
+                           VerticalOptions="Center">
+                        <Label.FontAttributes>
+                            <OnIdiom x:TypeArguments="FontAttributes" Phone="Bold" />
+                        </Label.FontAttributes>
+                    </Label>
+                </Grid>
+            </Border>
+
+            <!-- Quick Info -->
+            <Border Grid.Row="5"
+                    BackgroundColor="#11161F"
+                    Stroke="#1E293B"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 14"
+                    Padding="16">
+                <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
+                    <Label Text="Обход DPI"
+                           FontSize="13" TextColor="#555566" />
+                    <Label Text="Запускает zapret для обхода блокировок YouTube, Discord, Telegram и других сервисов."
+                           FontSize="12" TextColor="#8888AA"
+                           LineBreakMode="WordWrap" />
+                </Grid>
+            </Border>
+
+        </Grid>
+    </ScrollView>
+</ContentPage>

@@ -29,15 +29,20 @@
         <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
         <Setter Property="TextColor" Value="{StaticResource OnPrimary}" />
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
-        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontSize" Value="15" />
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="HeightRequest" Value="50" />
     </Style>
 
     <Style TargetType="Border">
-        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource Surface}" />
         <Setter Property="Stroke" Value="{StaticResource CardBorder}" />
         <Setter Property="StrokeThickness" Value="1" />
+    </Style>
+
+    <Style TargetType="Switch">
+        <Setter Property="ThumbColor" Value="{StaticResource TextPrimary}" />
+        <Setter Property="OnColor" Value="{StaticResource Primary}" />
     </Style>
 
     <Style TargetType="ScrollView">
@@ -45,8 +50,19 @@
     </Style>
 
     <Style TargetType="Frame">
-        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource Surface}" />
         <Setter Property="BorderColor" Value="{StaticResource CardBorder}" />
-        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="CornerRadius" Value="14" />
+    </Style>
+
+    <Style TargetType="TabbedPage">
+        <Setter Property="BackgroundColor" Value="{StaticResource Background}" />
+        <Setter Property="BarBackgroundColor" Value="#0D1117" />
+        <Setter Property="BarTextColor" Value="{StaticResource Primary}" />
+    </Style>
+
+    <Style TargetType="NavigationPage">
+        <Setter Property="BarBackgroundColor" Value="#0D1117" />
+        <Setter Property="BarTextColor" Value="{StaticResource Primary}" />
     </Style>
 </ResourceDictionary>

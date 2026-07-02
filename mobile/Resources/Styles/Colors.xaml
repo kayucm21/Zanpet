@@ -5,22 +5,29 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     x:Class="ZapretUI_Mobile.Resources.Styles.Colors">
 
-    <Color x:Key="Primary">#6c63ff</Color>
-    <Color x:Key="PrimaryDark">#5a52d5</Color>
-    <Color x:Key="PrimaryLight">#8b83ff</Color>
-    <Color x:Key="Secondary">#16213e</Color>
-    <Color x:Key="Background">#1a1a2e</Color>
-    <Color x:Key="Surface">#16213e</Color>
-    <Color x:Key="OnPrimary">White</Color>
-    <Color x:Key="OnBackground">White</Color>
-    <Color x:Key="OnSurface">White</Color>
-    <Color x:Key="TextPrimary">White</Color>
-    <Color x:Key="TextSecondary">#8888aa</Color>
-    <Color x:Key="Success">#00ff88</Color>
-    <Color x:Key="Error">#ff4444</Color>
-    <Color x:Key="Warning">#ffaa00</Color>
-    <Color x:Key="LogForeground">#00ff88</Color>
-    <Color x:Key="LogBackground">#16213e</Color>
-    <Color x:Key="CardBackground">#16213e</Color>
-    <Color x:Key="CardBorder">#6c63ff</Color>
+    <!-- PC-matching palette -->
+    <Color x:Key="Background">#090C11</Color>
+    <Color x:Key="Surface">#11161F</Color>
+    <Color x:Key="CardBackground">#141B25</Color>
+    <Color x:Key="CardBorder">#1E293B</Color>
+
+    <Color x:Key="Primary">#60A5FA</Color>
+    <Color x:Key="PrimaryDark">#3B82F6</Color>
+    <Color x:Key="PrimaryLight">#93C5FD</Color>
+    <Color x:Key="Secondary">#1E293B</Color>
+
+    <Color x:Key="Success">#34D399</Color>
+    <Color x:Key="Danger">#E2566A</Color>
+    <Color x:Key="Warning">#F5A623</Color>
+
+    <Color x:Key="TextPrimary">#FFFFFF</Color>
+    <Color x:Key="TextSecondary">#8888AA</Color>
+    <Color x:Key="TextMuted">#555566</Color>
+
+    <Color x:Key="OnPrimary">#090C11</Color>
+    <Color x:Key="OnBackground">#FFFFFF</Color>
+    <Color x:Key="OnSurface">#FFFFFF</Color>
+
+    <Color x:Key="LogForeground">#00FF88</Color>
+    <Color x:Key="LogBackground">#0D1117</Color>
 </ResourceDictionary>
