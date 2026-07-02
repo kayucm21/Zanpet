@@ -7,9 +7,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      DOTNET_NUGET_SIGNATURE_VERIFICATION: 'false'
-      DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER: '0'
     steps:
     - uses: actions/checkout@v4
 
@@ -17,19 +14,13 @@ jobs:
       with:
         dotnet-version: '9.0.x'
 
-    - name: Install MAUI
-      run: |
-        dotnet workload install maui --ignore-failed-sources 2>&1 || dotnet workload repair 2>&1
-        dotnet workload list
-
-    - name: Restore
-      run: dotnet restore "mobile/ZapretUI Mobile.csproj" 2>&1
+    - name: Restore workloads
+      run: dotnet workload restore "mobile/ZapretUI Mobile.csproj"
 
     - name: Publish
-      run: dotnet publish "mobile/ZapretUI Mobile.csproj" -f net9.0-android -c Release -r android-arm64 -o ./artifacts 2>&1
+      run: dotnet publish "mobile/ZapretUI Mobile.csproj" -f net9.0-android -c Release -r android-arm64 -o ./artifacts
 
     - name: Upload
-      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: zapret

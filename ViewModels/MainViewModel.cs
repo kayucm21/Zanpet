@@ -45,6 +45,8 @@ public sealed class MainViewModel : ObservableObject
         SavePresetCommand = new RelayCommand(_ => SavePreset(),
                                              _ => SelectedPreset is { IsBuiltIn: false });
 
+        ImportPresetCommand = new RelayCommand(async _ => await ImportPresetAsync(), _ => !IsUpdating);
+
         ApplyStrategyCommand = new RelayCommand(async _ => await ApplyStrategyAsync(),
                                                 _ => IsStrategyChangePending && !IsUpdating);
 
@@ -72,6 +74,8 @@ public sealed class MainViewModel : ObservableObject
         PresetsView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(Preset.GroupTitle)));
 
         _monitor.ConnectivityLost += () => OnUi(() => _ = AutoHealAsync());
+
+        ReloadPresets();
 
         _ = OnStartupVpnAsync();
     }
@@ -131,6 +135,7 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand DuplicatePresetCommand { get; }
     public RelayCommand DeletePresetCommand { get; }
     public RelayCommand SavePresetCommand { get; }
+    public RelayCommand ImportPresetCommand { get; }
     public RelayCommand SimpleToggleCommand { get; }
     public RelayCommand SetSimpleModeCommand { get; }
     public RelayCommand SetAdvancedModeCommand { get; }
@@ -688,6 +693,52 @@ public sealed class MainViewModel : ObservableObject
         AppendLog($"Пресет «{p.Name}» сохранён.");
     }
 
+    private async Task ImportPresetAsync()
+    {
+        try
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Импорт стратегии",
+                Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*",
+                Multiselect = true,
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            int added = 0, skipped = 0;
+            foreach (string file in dlg.FileNames)
+            {
+                try
+                {
+                    var preset = ClassicPresetImporter.ConvertPresetFile(file);
+                    if (preset is null) { skipped++; continue; }
+                    _presets.AddUser(preset);
+                    added++;
+                }
+                catch (Exception ex)
+                {
+                    AppendLog($"Ошибка импорта {Path.GetFileName(file)}: {ex.Message}");
+                    skipped++;
+                }
+            }
+
+            if (added > 0)
+            {
+                ReloadPresets();
+                AppendLog($"Импортировано {added} стратегий.{(skipped > 0 ? $" Пропущено: {skipped}." : "")}");
+                SelectedPreset = Presets.LastOrDefault();
+            }
+            else
+            {
+                AppendLog($"Импорт завершён. Не удалось импортировать стратегии (пропущено: {skipped}).");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Ошибка импорта: {ex.Message}");
+        }
+    }
+
     public void StopEngine() => _engine.Stop();
 
     public void Shutdown()
@@ -717,6 +768,7 @@ public sealed class MainViewModel : ObservableObject
         DuplicatePresetCommand.RaiseCanExecuteChanged();
         DeletePresetCommand.RaiseCanExecuteChanged();
         SavePresetCommand.RaiseCanExecuteChanged();
+        ImportPresetCommand.RaiseCanExecuteChanged();
         SimpleToggleCommand.RaiseCanExecuteChanged();
         ApplyStrategyCommand.RaiseCanExecuteChanged();
         HomeToggleCommand.RaiseCanExecuteChanged();
