@@ -82,7 +82,7 @@
                        FontSize="11"
                        FontFamily="Courier New"
                        TextColor="#00ff88"
-                       LineBreakMode="Wrap" />
+                       LineBreakMode="WordWrap" />
             </ScrollView>
         </Border>
 
