@@ -4,6 +4,11 @@ namespace ZapretUI_Mobile.Pages;
 
 public partial class StrategiesPage : ContentPage
 {
+    public StrategiesPage()
+    {
+        InitializeComponent();
+    }
+
     public StrategiesPage(MainPageViewModel vm)
     {
         InitializeComponent();

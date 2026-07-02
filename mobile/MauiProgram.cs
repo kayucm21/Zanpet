@@ -19,12 +19,6 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<XrayService>();
         builder.Services.AddSingleton<MainPageViewModel>();
-        builder.Services.AddTransient<MainTabbedPage>();
-        builder.Services.AddTransient<HomePage>();
-        builder.Services.AddTransient<StrategiesPage>();
-        builder.Services.AddTransient<VpnPage>();
-        builder.Services.AddTransient<SettingsPage>();
-        builder.Services.AddTransient<LogPage>();
 
         return builder.Build();
     }

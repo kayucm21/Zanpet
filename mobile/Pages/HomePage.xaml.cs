@@ -4,6 +4,11 @@ namespace ZapretUI_Mobile.Pages;
 
 public partial class HomePage : ContentPage
 {
+    public HomePage()
+    {
+        InitializeComponent();
+    }
+
     public HomePage(MainPageViewModel vm)
     {
         InitializeComponent();

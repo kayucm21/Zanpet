@@ -5,7 +5,12 @@ namespace ZapretUI_Mobile.Pages;
 
 public partial class VpnPage : ContentPage
 {
-    private readonly MainPageViewModel _vm;
+    private MainPageViewModel? _vm;
+
+    public VpnPage()
+    {
+        InitializeComponent();
+    }
 
     public VpnPage(MainPageViewModel vm)
     {
@@ -16,7 +21,7 @@ public partial class VpnPage : ContentPage
 
     private async void OnVpnConnectClicked(object? sender, EventArgs e)
     {
-        if (sender is Button btn && btn.BindingContext is VpnServer server)
+        if (_vm != null && sender is Button btn && btn.BindingContext is VpnServer server)
         {
             await _vm.VpnConnectFromServer(server);
         }

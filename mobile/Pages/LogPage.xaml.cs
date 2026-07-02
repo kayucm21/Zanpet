@@ -4,7 +4,12 @@ namespace ZapretUI_Mobile.Pages;
 
 public partial class LogPage : ContentPage
 {
-    private readonly MainPageViewModel _vm;
+    private MainPageViewModel? _vm;
+
+    public LogPage()
+    {
+        InitializeComponent();
+    }
 
     public LogPage(MainPageViewModel vm)
     {
