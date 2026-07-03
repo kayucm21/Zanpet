@@ -36,7 +36,13 @@ public sealed class UpdaterService
             try
             {
                 if (File.Exists(AppPaths.WinwsExe) && File.Exists(AppPaths.EngineVersionFile))
-                    return File.ReadAllText(AppPaths.EngineVersionFile).Trim();
+                {
+                    var raw = File.ReadAllText(AppPaths.EngineVersionFile).Trim();
+                    // Normalize version display: zapret2-v1.0.2 -> v2.0.0 (engine version)
+                    if (raw.Contains("zapret2", StringComparison.OrdinalIgnoreCase))
+                        return "v2.0.0";
+                    return raw;
+                }
             }
             catch { /* treat as not installed */ }
             return null;
