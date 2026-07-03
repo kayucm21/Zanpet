@@ -1,0 +1,32 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ====================== Light Theme Palette ====================== -->
+    <Color x:Key="C.Bg">#FFF8F9FC</Color>
+    <Color x:Key="C.Surface">#FFFFFFFF</Color>
+    <Color x:Key="C.Card">#FFFFFFFF</Color>
+    <Color x:Key="C.SurfaceAlt">#FFF1F5F9</Color>
+    <Color x:Key="C.Border">#12000000</Color>
+    <Color x:Key="C.Fg">#FF1A1D24</Color>
+    <Color x:Key="C.FgMuted">#FF64748B</Color>
+    <Color x:Key="C.Muted2">#FF94A3B8</Color>
+    <Color x:Key="C.Accent">#FF2563EB</Color>
+    <Color x:Key="C.AccentHover">#FF1D4ED8</Color>
+    <Color x:Key="C.AccentSoft">#182563EB</Color>
+
+    <SolidColorBrush x:Key="BgBrush"        Color="{StaticResource C.Bg}"/>
+    <SolidColorBrush x:Key="SurfaceBrush"   Color="{StaticResource C.Surface}"/>
+    <SolidColorBrush x:Key="CardBrush"      Color="{StaticResource C.Card}"/>
+    <SolidColorBrush x:Key="SurfaceAltBrush" Color="{StaticResource C.SurfaceAlt}"/>
+    <SolidColorBrush x:Key="BorderBrush2"   Color="{StaticResource C.Border}"/>
+    <SolidColorBrush x:Key="FgBrush"        Color="{StaticResource C.Fg}"/>
+    <SolidColorBrush x:Key="FgMutedBrush"   Color="{StaticResource C.FgMuted}"/>
+    <SolidColorBrush x:Key="Muted2Brush"    Color="{StaticResource C.Muted2}"/>
+    <SolidColorBrush x:Key="AccentBrush"    Color="{StaticResource C.Accent}"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource C.AccentHover}"/>
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="{StaticResource C.AccentSoft}"/>
+    <SolidColorBrush x:Key="SuccessBrush"   Color="#FF16A34A"/>
+    <SolidColorBrush x:Key="DangerBrush"    Color="#FFDC2626"/>
+    <SolidColorBrush x:Key="WarnBrush"      Color="#FFF59E0B"/>
+
+</ResourceDictionary>

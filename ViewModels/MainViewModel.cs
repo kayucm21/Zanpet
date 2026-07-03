@@ -366,6 +366,20 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    public bool IsLightTheme
+    {
+        get => Settings.Theme.Equals("light", StringComparison.OrdinalIgnoreCase);
+        set
+        {
+            string theme = value ? "light" : "dark";
+            if (string.Equals(Settings.Theme, theme, StringComparison.OrdinalIgnoreCase)) return;
+            Settings.Theme = theme;
+            _settingsSvc.Save();
+            ThemeManager.ApplyTheme(theme);
+            OnPropertyChanged();
+        }
+    }
+
     private void UpdateMonitor()
     {
         if (IsRunning && Settings.AutoHeal) { if (!_monitor.IsRunning) _monitor.Start(); }
@@ -440,6 +454,9 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task InitializeAsync()
     {
+        // Apply saved theme
+        ThemeManager.ApplyTheme(Settings.Theme);
+
         // Copy engine binaries + data from ClassicData FIRST so the engine
         // check below finds winws2.exe without needing GitHub on a fresh install.
         AutoImportClassicPresets();

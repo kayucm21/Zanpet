@@ -34,6 +34,9 @@ public sealed class AppSettings
     /// (kept safe by the exclude list); convenient but may break a game/app that isn't excluded.</summary>
     public bool BypassAllSites { get; set; }
 
+    /// <summary>Theme mode: "dark" (default) or "light".</summary>
+    public string Theme { get; set; } = "dark";
+
     /// <summary>Normalize values after deserialization to guard against corrupt/invalid JSON.</summary>
     public AppSettings Normalize()
     {
