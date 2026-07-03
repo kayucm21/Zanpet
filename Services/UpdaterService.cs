@@ -73,6 +73,7 @@ public sealed class UpdaterService
     /// <summary>Latest app release (tag + page URL) from GitHub, or null on any failure.</summary>
     public async Task<(string Tag, string Url)?> FetchAppLatestAsync(CancellationToken ct = default)
     {
+        // Try API first
         try
         {
             using var resp = await Http.GetAsync(AppReleasesLatestApi, ct).ConfigureAwait(false);
@@ -83,9 +84,26 @@ public sealed class UpdaterService
             string tag = root.GetProperty("tag_name").GetString() ?? "";
             string url = root.TryGetProperty("html_url", out var u) ? (u.GetString() ?? "") : "";
             if (string.IsNullOrEmpty(url)) url = AppReleasesPage;
-            return string.IsNullOrEmpty(tag) ? null : (tag, url);
+            if (!string.IsNullOrEmpty(tag)) return (tag, url);
         }
-        catch { return null; }
+        catch { /* API blocked or failed, try web fallback */ }
+
+        // Web fallback: scrape the releases page HTML
+        try
+        {
+            using var resp = await Http.GetAsync(AppReleasesPage, ct).ConfigureAwait(false);
+            resp.EnsureSuccessStatusCode();
+            string html = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            // Look for tag in /releases/tag/vX.Y.Z pattern
+            var m = System.Text.RegularExpressions.Regex.Match(html, @"/releases/tag/([^""\s]+)");
+            if (m.Success)
+            {
+                string tag = m.Groups[1].Value.TrimStart('v');
+                return (tag, AppReleasesPage);
+            }
+        }
+        catch { /* both paths failed */ }
+        return null;
     }
 
     /// <summary>Fetch the zip download URL for a specific app release tag.</summary>

@@ -641,8 +641,23 @@ public sealed class MainViewModel : ObservableObject
                         }
                     }
                 }
+                else if (appLatest is null)
+                {
+                    string msg = "Не удалось проверить обновление приложения (GitHub недоступен).";
+                    UpdateStatus = msg;
+                    AppendLog(msg);
+                }
+                else
+                {
+                    string msg = $"Приложение актуально: v{UpdaterService.AppVersion}";
+                    UpdateStatus = msg;
+                    AppendLog(msg);
+                }
             }
-            catch { /* app update check is non-critical */ }
+            catch (Exception ex)
+            {
+                AppendLog($"Ошибка проверки обновления приложения: {ex.Message}");
+            }
         }
         finally
         {
