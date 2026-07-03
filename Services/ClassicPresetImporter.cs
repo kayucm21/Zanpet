@@ -245,8 +245,7 @@ public sealed class ClassicPresetImporter
         foreach (var f in Directory.EnumerateFiles(source, pattern))
         {
             string destFile = Path.Combine(dest, Path.GetFileName(f));
-            if (!File.Exists(destFile))
-                File.Copy(f, destFile, overwrite: false);
+            File.Copy(f, destFile, overwrite: true);
         }
     }
 }

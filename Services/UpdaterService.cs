@@ -157,14 +157,21 @@ public sealed class UpdaterService
             string exeDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
             string batPath = Path.Combine(Path.GetTempPath(), "ZapretUI-update.bat");
             string selfExe = Environment.ProcessPath ?? Path.Combine(exeDir, "ZapretUI.exe");
+            string logPath = Path.Combine(Path.GetTempPath(), "ZapretUI-update.log");
 
             var bat = new StringBuilder();
             bat.AppendLine("@echo off");
-            bat.AppendLine("timeout /t 2 /nobreak >nul");
-            bat.AppendLine($"xcopy /E /Y /I \"{stageDir}\\*\" \"{exeDir}\\\" >nul 2>&1");
+            bat.AppendLine($"echo %date% %time% > \"{logPath}\"");
+            bat.AppendLine("echo Waiting for old process to exit...");
+            bat.AppendLine("timeout /t 4 /nobreak >nul");
+            bat.AppendLine($"echo Copying files from {stageDir} to {exeDir}...");
+            bat.AppendLine($"robocopy \"{stageDir}\" \"{exeDir}\" /E /Y /R:3 /W:2 >> \"{logPath}\" 2>&1");
+            bat.AppendLine($"if %ERRORLEVEL% LSS 8 (echo SUCCESS >> \"{logPath}\") else (echo COPY FAILED with code %ERRORLEVEL% >> \"{logPath}\")");
             bat.AppendLine($"del /Q \"{zipPath}\" >nul 2>&1");
             bat.AppendLine($"rmdir /S /Q \"{stageDir}\" >nul 2>&1");
-            bat.AppendLine($"start \"\" \"{selfExe}\"");
+            bat.AppendLine($"echo Starting {selfExe}...");
+            bat.AppendLine($"start \"\" \"{selfExe}\" --launched-after-update");
+            bat.AppendLine("timeout /t 2 /nobreak >nul");
             bat.AppendLine($"del /Q \"%~f0\" >nul 2>&1");
 
             File.WriteAllText(batPath, bat.ToString(), Encoding.UTF8);

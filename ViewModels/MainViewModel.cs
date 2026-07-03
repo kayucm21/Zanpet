@@ -457,9 +457,13 @@ public sealed class MainViewModel : ObservableObject
         // Apply saved theme
         ThemeManager.ApplyTheme(Settings.Theme);
 
+        // If launched after self-update, force re-copy engine from ClassicData
+        bool forceEngineUpdate = Environment.GetCommandLineArgs()
+            .Any(a => a.Equals("--launched-after-update", StringComparison.OrdinalIgnoreCase));
+
         // Copy engine binaries + data from ClassicData FIRST so the engine
         // check below finds winws2.exe without needing GitHub on a fresh install.
-        AutoImportClassicPresets();
+        AutoImportClassicPresets(forceEngineUpdate);
 
         ReloadPresets();
         _hostlists.SeedDefaults();
@@ -480,7 +484,7 @@ public sealed class MainViewModel : ObservableObject
             Start();
     }
 
-    private void AutoImportClassicPresets()
+    private void AutoImportClassicPresets(bool force = false)
     {
         try
         {
