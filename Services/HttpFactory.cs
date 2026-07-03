@@ -50,7 +50,7 @@ public static class HttpFactory
             Timeout = TimeSpan.FromMinutes(10),
         };
         http.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("ZapretUI", "2.4"));
+            new ProductInfoHeaderValue("ZapretUI", "2.5"));
         http.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         return http;
@@ -63,7 +63,7 @@ public static class HttpFactory
             Timeout = TimeSpan.FromMinutes(15),
         };
         http.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("ZapretUI", "2.4"));
+            new ProductInfoHeaderValue("ZapretUI", "2.5"));
         return http;
     }
 }

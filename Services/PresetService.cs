@@ -109,13 +109,38 @@ public sealed class PresetService
     {
         Combo(
             name: "YouTube + Discord + Telegram",
-            description: "Рекомендуемая стратегия: YouTube, Discord (войс/медиа), Telegram и остальной TLS/QUIC. Настройте «Область обхода» и «Игровой фильтр» в Настройках.",
+            description: "Рекомендуемая стратегия: YouTube, Discord (войс/_MEDIA), Telegram и остальной TLS/QUIC. Настройте «Область обхода» и «Игровой фильтр» в Настройках.",
             recommended: true
+        ),
+        Combo(
+            name: "Multidisorder Advanced",
+            description: "Продвинутый multidisorder с multisplit по нескольким позициям. Использует seqovl для дополнительного искажения. Для агрессивных DPI.",
+            recommended: false,
+            buildArgs: BuildMultidisorderArgs
+        ),
+        Combo(
+            name: "FakeSplit Pro",
+            description: "fakedsplit + fakeddisorder: отправка поддельных сегментов перед реальными. Двойное искажение для максимального обхода DPI.",
+            recommended: false,
+            buildArgs: BuildFakeSplitArgs
+        ),
+        Combo(
+            name: "TCP Segmentation",
+            description: "tcpseg: агрессивная сегментация TCP через seqovl. Разбивает пакет на мелкие куски с наложением. Для DPI, не разбирающих сегментацию.",
+            recommended: false,
+            buildArgs: BuildTcpSegArgs
+        ),
+        Combo(
+            name: "OOB Injection",
+            description: "Out-of-band injection: внедрение байта OOB в TCP поток с URG-флагом. Сбивает DPI, который не обрабатывает экстренные данные.",
+            recommended: false,
+            buildArgs: BuildOobArgs
         ),
     };
 
     private static Preset Combo(
         string name, string description, bool recommended,
+        Func<List<string>>? buildArgs = null,
         string[]? proxyTls = null)
         => new()
         {
@@ -124,7 +149,7 @@ public sealed class PresetService
             IsBuiltIn = true,
             IsRecommended = recommended,
             RequiresProxyHost = proxyTls is not null,
-            Args = BuildComboArgs(proxyTls: proxyTls),
+            Args = buildArgs?.Invoke() ?? BuildComboArgs(proxyTls: proxyTls),
         };
 
     public static List<string> BuildComboArgs(string? discordFilter = null, string[]? proxyTls = null)
@@ -168,5 +193,135 @@ public sealed class PresetService
         });
 
         return a;
+    }
+
+    public static List<string> BuildMultidisorderArgs()
+    {
+        return new List<string>
+        {
+            "{WF_TCP}",
+            "{WF_UDP}",
+            "--blob=tls_google:@{FILES}/fake/tls_clienthello_www_google_com.bin",
+            "--blob=quic_google:@{FILES}/fake/quic_initial_www_google_com.bin",
+            "--blob=stun_pat:@{FILES}/fake/stun.bin",
+            "--wf-raw-part=@{WF}/windivert_part.discord_media.txt",
+            "--wf-raw-part=@{WF}/windivert_part.stun.txt",
+            "--wf-raw-part=@{WF}/windivert_part.wireguard.txt",
+            "--filter-tcp=80,443-65535",
+            "{IPSET_EXCLUDE:ru}",
+            "--out-range=-d7",
+            "--lua-desync=send:repeats=3",
+            "--lua-desync=syndata:blob=stun_pat:repeats=3",
+            "--lua-desync=tls_multisplit_sni:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
+            "--lua-desync=multidisorder:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
+            "--new",
+            "--filter-udp=80,443-65535",
+            "{IPSET_EXCLUDE:ru}",
+            "--payload=all",
+            "--out-range=-d8",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=12:payload=all",
+            "--new",
+            "--filter-udp=19294-19344,50000-65535",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=3",
+        };
+    }
+
+    public static List<string> BuildFakeSplitArgs()
+    {
+        return new List<string>
+        {
+            "{WF_TCP}",
+            "{WF_UDP}",
+            "--blob=tls_google:@{FILES}/fake/tls_clienthello_www_google_com.bin",
+            "--blob=quic_google:@{FILES}/fake/quic_initial_www_google_com.bin",
+            "--blob=stun_pat:@{FILES}/fake/stun.bin",
+            "--wf-raw-part=@{WF}/windivert_part.discord_media.txt",
+            "--wf-raw-part=@{WF}/windivert_part.stun.txt",
+            "--wf-raw-part=@{WF}/windivert_part.wireguard.txt",
+            "--filter-tcp=80,443-65535",
+            "{IPSET_EXCLUDE:ru}",
+            "--out-range=-d7",
+            "--lua-desync=send:repeats=2",
+            "--lua-desync=syndata:blob=stun_pat:repeats=2",
+            "--lua-desync=fakedsplit:blob=tls_google:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
+            "--new",
+            "--filter-tcp=80,443-65535",
+            "{IPSET_EXCLUDE:ru}",
+            "--lua-desync=fakeddisorder:blob=tls_google:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
+            "--new",
+            "--filter-udp=80,443-65535",
+            "{IPSET_EXCLUDE:ru}",
+            "--payload=all",
+            "--out-range=-d8",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all",
+            "--new",
+            "--filter-udp=19294-19344,50000-65535",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
+        };
+    }
+
+    public static List<string> BuildTcpSegArgs()
+    {
+        return new List<string>
+        {
+            "{WF_TCP}",
+            "{WF_UDP}",
+            "--blob=tls_google:@{FILES}/fake/tls_clienthello_www_google_com.bin",
+            "--blob=quic_google:@{FILES}/fake/quic_initial_www_google_com.bin",
+            "--blob=stun_pat:@{FILES}/fake/stun.bin",
+            "--wf-raw-part=@{WF}/windivert_part.discord_media.txt",
+            "--wf-raw-part=@{WF}/windivert_part.stun.txt",
+            "--wf-raw-part=@{WF}/windivert_part.wireguard.txt",
+            "--filter-tcp=80,443-65535",
+            "{IPSET_EXCLUDE:ru}",
+            "--out-range=-d7",
+            "--lua-desync=send:repeats=2",
+            "--lua-desync=syndata:blob=stun_pat:repeats=2",
+            "--lua-desync=tcpseg:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
+            "--new",
+            "--filter-udp=80,443-65535",
+            "{IPSET_EXCLUDE:ru}",
+            "--payload=all",
+            "--out-range=-d8",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all",
+            "--new",
+            "--filter-udp=19294-19344,50000-65535",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
+        };
+    }
+
+    public static List<string> BuildOobArgs()
+    {
+        return new List<string>
+        {
+            "{WF_TCP}",
+            "{WF_UDP}",
+            "--blob=tls_google:@{FILES}/fake/tls_clienthello_www_google_com.bin",
+            "--blob=quic_google:@{FILES}/fake/quic_initial_www_google_com.bin",
+            "--blob=stun_pat:@{FILES}/fake/stun.bin",
+            "--wf-raw-part=@{WF}/windivert_part.discord_media.txt",
+            "--wf-raw-part=@{WF}/windivert_part.stun.txt",
+            "--wf-raw-part=@{WF}/windivert_part.wireguard.txt",
+            "--filter-tcp=80,443-65535",
+            "{IPSET_EXCLUDE:ru}",
+            "--out-range=-d7",
+            "--lua-desync=send:repeats=2",
+            "--lua-desync=syndata:blob=stun_pat:repeats=2",
+            "--lua-desync=oob:byte=0x00:urp=1:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
+            "--lua-desync=tls_multisplit_sni:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20",
+            "--new",
+            "--filter-udp=80,443-65535",
+            "{IPSET_EXCLUDE:ru}",
+            "--payload=all",
+            "--out-range=-d8",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all",
+            "--new",
+            "--filter-udp=19294-19344,50000-65535",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
+        };
     }
 }

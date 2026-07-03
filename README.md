@@ -40,19 +40,26 @@
 
 ---
 
-## v2.4.0 — Что нового
+## v2.5.0 — Что нового
+
+### Движок
+- **zapret2 v1.0.2** (engine 2.0.0) — последняя версия движка
+- Обновлённые Lua-скрипты с новыми функциями
+
+### Новые пресеты (функции движка 2.0.0)
+| Пресет | Функция | Описание |
+|--------|---------|----------|
+| **Multidisorder Advanced** | `multidisorder` | Множественный disorder + multisplit с seqovl |
+| **FakeSplit Pro** | `fakedsplit` + `fakeddisorder` | Двойное искажение: поддельные сегменты перед реальными |
+| **TCP Segmentation** | `tcpseg` | Агрессивная сегментация TCP с наложением |
+| **OOB Injection** | `oob` | Out-of-band injection с URG-флагом |
 
 ### Оптимизация
-- **Shared HttpClient** — единый пул соединений вместо отдельного на каждый сервис (экономия сокетов, DNS-кеш)
-- **Кэширование пресетов** — `PresetService.All` кэшируется и инвалидируется только при изменении
-- **Async Stop** — новый `StopAsync()` для неблокирующей остановки движка с таймаутом
-- **CancellationToken disposal** — корректная очистка `MonitorService` при завершении
-- **SettingsVersion** — схема миграции настроек для будущих обновлений
-
-### Под капотом
-- Версия: `2.4.0`
-- Целевой фреймворк: .NET 9.0
-- Self-contained: да (win-x64)
+- **Shared HttpClient** — единый пул соединений
+- **Кэширование пресетов** — `PresetService.All` кэшируется
+- **Async Stop** — неблокирующая остановка движка (`StopAsync`)
+- **CancellationToken disposal** — корректная очистка `MonitorService`
+- **SettingsVersion** — схема миграции настроек
 
 ---
 
