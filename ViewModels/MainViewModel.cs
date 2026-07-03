@@ -469,7 +469,7 @@ public sealed class MainViewModel : ObservableObject
         SelectedPreset = Presets.FirstOrDefault(p => p.Name == Settings.ActivePresetName)
                          ?? Presets.FirstOrDefault();
 
-        EngineVersion = _updater.InstalledVersion ?? "не установлен";
+        EngineVersion = _updater.InstalledVersionDisplay ?? "не установлен";
 
         if (!_updater.IsEngineInstalled || !_updater.IsEngineComplete)
             await CheckAndUpdateAsync(silent: true);
@@ -585,7 +585,7 @@ public sealed class MainViewModel : ObservableObject
                         MessageBox.Show($"Ошибка загрузки движка: {ex.Message}", "Обновление", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
-                EngineVersion = _updater.InstalledVersion ?? "—";
+                EngineVersion = _updater.InstalledVersionDisplay ?? "—";
                 UpdateStatus = $"Движок обновлён: {latest.Tag}";
                 AppendLog($"Движок обновлён: {latest.Tag}");
                 OnPropertyChanged(nameof(CanStart));

@@ -213,23 +213,28 @@ public sealed class ClassicPresetImporter
             foreach (var f in Directory.EnumerateFiles(srcExe, "*.dll"))
             {
                 string dest = Path.Combine(engineDir, Path.GetFileName(f));
-                if (!File.Exists(dest))
-                    File.Copy(f, dest, overwrite: false);
+                File.Copy(f, dest, overwrite: true);
             }
             foreach (var f in Directory.EnumerateFiles(srcExe, "*.sys"))
             {
                 string dest = Path.Combine(engineDir, Path.GetFileName(f));
-                if (!File.Exists(dest))
-                    File.Copy(f, dest, overwrite: false);
+                File.Copy(f, dest, overwrite: true);
             }
             // Copy engine binaries (winws2.exe + cygwin1.dll) so the app works
             // without downloading from GitHub on every fresh install.
-            foreach (var name in new[] { "winws2.exe", "cygwin1.dll" })
+            foreach (var name in new[] { "winws2.exe", "cygwin1.dll", "mdig.exe", "ip2net.exe" })
             {
                 string src = Path.Combine(srcExe, name);
                 string dest = Path.Combine(engineDir, name);
-                if (File.Exists(src) && !File.Exists(dest))
-                    File.Copy(src, dest, overwrite: false);
+                if (File.Exists(src))
+                    File.Copy(src, dest, overwrite: true);
+            }
+
+            string srcVersion = Path.Combine(sourceDir, "installed_version.txt");
+            if (File.Exists(srcVersion))
+            {
+                string destVersion = Path.Combine(engineDir, "installed_version.txt");
+                File.Copy(srcVersion, destVersion, overwrite: true);
             }
         }
     }
