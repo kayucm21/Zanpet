@@ -9,7 +9,7 @@ namespace ZapretUI.Services;
 /// failure it raises <see cref="ConnectivityLost"/> so the app can silently
 /// re-pick a strategy and self-heal. Cheap and quiet — one probe per target per tick.
 /// </summary>
-public sealed class MonitorService
+public sealed class MonitorService : IDisposable
 {
     private static readonly string[] Watch = { "gateway.discord.gg", "www.youtube.com" };
     private const int TickSeconds = 45;
@@ -22,22 +22,24 @@ public sealed class MonitorService
     public event Action<bool>? Tick;
 
     private CancellationTokenSource? _cts;
-    public bool IsRunning => _cts is not null;
+    private bool _disposed;
+
+    public bool IsRunning => _cts is not null && !_cts.IsCancellationRequested;
 
     public void Start()
     {
         Stop();
         _cts = new CancellationTokenSource();
-        _ = LoopAsync(_cts.Token);
+        var token = _cts.Token;
+        _ = LoopAsync(token);
     }
 
     public void Stop()
     {
-        // Cancel but don't Dispose: the running LoopAsync may still be awaiting Task.Delay on this
-        // token, and disposing the CTS out from under it can surface as ObjectDisposedException
-        // instead of a clean cancel. No CancelAfter/wait-handle is used, so GC reclaims the CTS.
-        try { _cts?.Cancel(); } catch { }
-        _cts = null;
+        var cts = Interlocked.Exchange(ref _cts, null);
+        if (cts is null) return;
+        try { cts.Cancel(); } catch { }
+        try { cts.Dispose(); } catch { }
     }
 
     private async Task LoopAsync(CancellationToken ct)
@@ -47,8 +49,8 @@ public sealed class MonitorService
         {
             while (!ct.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromSeconds(TickSeconds), ct);
-                bool ok = await HealthyAsync(ct);
+                await Task.Delay(TimeSpan.FromSeconds(TickSeconds), ct).ConfigureAwait(false);
+                bool ok = await HealthyAsync(ct).ConfigureAwait(false);
                 Tick?.Invoke(ok);
                 if (ok) { fails = 0; continue; }
 
@@ -56,7 +58,7 @@ public sealed class MonitorService
                 {
                     fails = 0;
                     ConnectivityLost?.Invoke();
-                    await Task.Delay(TimeSpan.FromSeconds(BackoffSeconds), ct); // let the heal settle
+                    await Task.Delay(TimeSpan.FromSeconds(BackoffSeconds), ct).ConfigureAwait(false);
                 }
             }
         }
@@ -69,9 +71,16 @@ public sealed class MonitorService
     {
         foreach (var host in Watch)
         {
-            if (await NetProbe.TlsAsync(host, SslProtocols.Tls12, ct) != DiagStatus.Ok)
+            if (await NetProbe.TlsAsync(host, SslProtocols.Tls12, ct).ConfigureAwait(false) != DiagStatus.Ok)
                 return false;
         }
         return true;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        Stop();
     }
 }

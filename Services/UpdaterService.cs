@@ -1,7 +1,6 @@
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -27,16 +26,7 @@ public sealed class UpdaterService
     private const string AppReleasesPage =
         "https://github.com/kayucm21/Zanpet/releases/latest";
 
-    private readonly HttpClient _http;
-
-    public UpdaterService()
-    {
-        _http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        _http.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("ZapretUI", "1.0"));
-        _http.DefaultRequestHeaders.Accept.Add(
-            new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-    }
+    private static HttpClient Http => HttpFactory.GitHub;
 
     /// <summary>Currently installed engine tag, or null if the engine is absent.</summary>
     public string? InstalledVersion
@@ -72,7 +62,7 @@ public sealed class UpdaterService
     {
         try
         {
-            using var resp = await _http.GetAsync(AppReleasesLatestApi, ct).ConfigureAwait(false);
+            using var resp = await Http.GetAsync(AppReleasesLatestApi, ct).ConfigureAwait(false);
             resp.EnsureSuccessStatusCode();
             await using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
@@ -91,7 +81,7 @@ public sealed class UpdaterService
         try
         {
             string apiUrl = $"https://api.github.com/repos/kayucm21/Zanpet/releases/tags/{tag}";
-            using var resp = await _http.GetAsync(apiUrl, ct).ConfigureAwait(false);
+            using var resp = await Http.GetAsync(apiUrl, ct).ConfigureAwait(false);
             resp.EnsureSuccessStatusCode();
             using var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false), cancellationToken: ct).ConfigureAwait(false);
             foreach (var asset in doc.RootElement.GetProperty("assets").EnumerateArray())
@@ -117,7 +107,7 @@ public sealed class UpdaterService
         try
         {
             progress?.Report(0);
-            using (var dl = await _http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
+            using (var dl = await Http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
             {
                 dl.EnsureSuccessStatusCode();
                 long total = dl.Content.Headers.ContentLength ?? 0;
@@ -229,7 +219,7 @@ public sealed class UpdaterService
     /// <summary>Latest release via api.github.com (JSON).</summary>
     private async Task<ReleaseInfo> FetchLatestViaApiAsync(CancellationToken ct)
     {
-        using var resp = await _http.GetAsync(ReleasesLatestApi, ct).ConfigureAwait(false);
+        using var resp = await Http.GetAsync(ReleasesLatestApi, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
         await using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
         using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
@@ -271,7 +261,7 @@ public sealed class UpdaterService
     private async Task<ReleaseInfo> FetchLatestViaWebAsync(CancellationToken ct)
     {
         // 1. The tag — github.com/<repo>/releases/latest 302-redirects to …/releases/tag/<tag>.
-        using var resp = await _http.GetAsync(
+        using var resp = await Http.GetAsync(
             $"https://github.com/{EngineRepo}/releases/latest", ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
         string finalUrl = resp.RequestMessage?.RequestUri?.ToString() ?? "";
@@ -281,7 +271,7 @@ public sealed class UpdaterService
         if (tag.Length == 0) throw new InvalidOperationException("Пустой тег релиза на github.com.");
 
         // 2. The assets — the expanded_assets partial lists every download link.
-        string html = await _http.GetStringAsync(
+        string html = await Http.GetStringAsync(
             $"https://github.com/{EngineRepo}/releases/expanded_assets/{Uri.EscapeDataString(tag)}", ct)
             .ConfigureAwait(false);
 
@@ -339,7 +329,7 @@ public sealed class UpdaterService
             if (release.Sha256Url is not null)
             {
                 progress?.Report(new UpdateProgress(UpdatePhase.Verifying, 0, "Проверка контрольных сумм…"));
-                string shaText = await _http.GetStringAsync(release.Sha256Url, ct).ConfigureAwait(false);
+                string shaText = await Http.GetStringAsync(release.Sha256Url, ct).ConfigureAwait(false);
                 hashes = ParseSha256Sum(shaText);
             }
 
@@ -372,7 +362,7 @@ public sealed class UpdaterService
         string url, string destPath, long knownSize,
         IProgress<UpdateProgress>? progress, CancellationToken ct)
     {
-        using var resp = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct)
+        using var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct)
             .ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
 

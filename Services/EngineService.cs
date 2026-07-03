@@ -412,6 +412,42 @@ public sealed class EngineService : IDisposable
         // OnProcessExited finalizes state and closes the log.
     }
 
+    /// <summary>
+    /// Non-blocking async stop: kills the engine and waits up to <paramref name="timeout"/>
+    /// for it to exit. Returns true if the engine stopped within the timeout.
+    /// </summary>
+    public async Task<bool> StopAsync(TimeSpan? timeout = null)
+    {
+        var waitTime = timeout ?? TimeSpan.FromSeconds(5);
+        Process? proc;
+        lock (_lock)
+        {
+            if (_proc is null || State == EngineState.Stopped) return true;
+            SetState(EngineState.Stopping);
+            proc = _proc;
+        }
+        try
+        {
+            if (!proc.HasExited)
+            {
+                proc.Kill(entireProcessTree: true);
+                using var cts = new CancellationTokenSource(waitTime);
+                await proc.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+            }
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            Emit("Таймаут остановки движка — процесс не завершился вовремя.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Emit($"Ошибка асинхронной остановки: {ex.Message}");
+            return false;
+        }
+    }
+
     private void OnProcessExited(object? sender, EventArgs e)
     {
         lock (_lock)

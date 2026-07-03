@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Text.Json;
 using ZapretUI.Models;
@@ -15,10 +16,16 @@ public sealed class PresetService
 
     public List<Preset> UserPresets { get; private set; } = new();
 
+    /// <summary>Cached combined list (built-ins + user). Invalidated on add/remove/save.</summary>
+    private IReadOnlyList<Preset>? _allCache;
+
     public PresetService() => Load();
 
-    /// <summary>Built-ins first, then user presets.</summary>
-    public IReadOnlyList<Preset> All => BuiltIns().Concat(UserPresets).ToList();
+    /// <summary>Built-ins first, then user presets. Cached for performance.</summary>
+    public IReadOnlyList<Preset> All => _allCache ??= BuiltIns().Concat(UserPresets).ToList();
+
+    /// <summary>Force cache invalidation (called after add/delete/import).</summary>
+    private void InvalidateCache() => _allCache = null;
 
     public Preset? FindByName(string name) =>
         All.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.Ordinal));
@@ -26,12 +33,12 @@ public sealed class PresetService
     public void AddUser(Preset p)
     {
         p.IsBuiltIn = false;
-        // Ensure a unique name.
         string baseName = p.Name;
         int i = 2;
         while (FindByName(p.Name) is not null)
             p.Name = $"{baseName} ({i++})";
         UserPresets.Add(p);
+        InvalidateCache();
         Save();
     }
 
@@ -45,6 +52,22 @@ public sealed class PresetService
     {
         if (p.IsBuiltIn) return;
         UserPresets.Remove(p);
+        InvalidateCache();
+        Save();
+    }
+
+    public void BulkImport(IEnumerable<Preset> presets)
+    {
+        foreach (var p in presets)
+        {
+            p.IsBuiltIn = false;
+            string baseName = p.Name;
+            int i = 2;
+            while (FindByName(p.Name) is not null)
+                p.Name = $"{baseName} ({i++})";
+            UserPresets.Add(p);
+        }
+        InvalidateCache();
         Save();
     }
 
@@ -53,8 +76,6 @@ public sealed class PresetService
         try
         {
             AppPaths.EnsureCreated();
-            // Write to a temp file then atomically replace: a crash mid-write can't truncate the real
-            // presets.json (which Load would then reject, wiping every user preset).
             string tmp = AppPaths.PresetsFile + ".tmp";
             File.WriteAllText(tmp, JsonSerializer.Serialize(UserPresets, JsonOpts));
             File.Move(tmp, AppPaths.PresetsFile, overwrite: true);
@@ -80,8 +101,6 @@ public sealed class PresetService
         catch
         {
             UserPresets = new();
-            // Keep the unreadable file aside instead of letting the next Save overwrite it with an
-            // empty list — the user can recover their presets from the .bak.
             try { File.Move(AppPaths.PresetsFile, AppPaths.PresetsFile + ".bak", overwrite: true); } catch { }
         }
     }
@@ -95,10 +114,6 @@ public sealed class PresetService
         ),
     };
 
-    /// <summary>
-    /// Builds a full per-service combo preset: Discord / YouTube TLS + QUIC + Discord voice.
-    /// Uses only arguments confirmed working with the bundled Flowseal winws2 — no --filter-l7.
-    /// </summary>
     private static Preset Combo(
         string name, string description, bool recommended,
         string[]? proxyTls = null)
@@ -112,15 +127,10 @@ public sealed class PresetService
             Args = BuildComboArgs(proxyTls: proxyTls),
         };
 
-    /// <summary>
-    /// Build the shared combo argument list. Format matches the working imported classic presets:
-    /// --filter-tcp/--filter-udp with port ranges (no --filter-l7), --lua-desync, --blob, --wf-raw-part.
-    /// </summary>
     public static List<string> BuildComboArgs(string? discordFilter = null, string[]? proxyTls = null)
     {
         var a = new List<string>
         {
-            // --- Глобальные настройки ---
             "{WF_TCP}",
             "{WF_UDP}",
             "--blob=tls_google:@{FILES}/fake/tls_clienthello_www_google_com.bin",
@@ -129,7 +139,6 @@ public sealed class PresetService
             "--wf-raw-part=@{WF}/windivert_part.discord_media.txt",
             "--wf-raw-part=@{WF}/windivert_part.stun.txt",
             "--wf-raw-part=@{WF}/windivert_part.wireguard.txt",
-            // --- 1) TCP catch-all: YouTube + Discord + Telegram + весь TLS ---
             "--filter-tcp=80,443-65535",
             "{IPSET_EXCLUDE:ru}",
             "--out-range=-d7",
@@ -143,7 +152,6 @@ public sealed class PresetService
             a.AddRange(new[] { "--filter-tcp=1-65535", "{IPSET:proxy}", "--out-range=-d7" });
             a.AddRange(proxyTls);
         }
-        // --- 2) UDP: QUIC YouTube + Discord + Telegram ---
         a.Add("--new");
         a.AddRange(new[] {
             "--filter-udp=80,443-65535",
@@ -152,7 +160,6 @@ public sealed class PresetService
             "--out-range=-d8",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all",
         });
-        // --- 3) Discord voice (STUN + IP-discovery) ---
         a.Add("--new");
         a.AddRange(new[] {
             "--filter-udp=19294-19344,50000-65535",
@@ -162,5 +169,4 @@ public sealed class PresetService
 
         return a;
     }
-
 }

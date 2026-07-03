@@ -1,15 +1,19 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace ZapretUI.Services;
 
 public sealed class AppSettings
 {
+    /// <summary>Schema version for future migrations. Bump when adding/removing fields.</summary>
+    public int SettingsVersion { get; set; } = 1;
+
     public string? ActivePresetName { get; set; }
     public string? ActiveHostlist { get; set; }
     public bool AutoUpdateEngine { get; set; } = true;
     public bool Autostart { get; set; }
-    public bool AutostartEngine { get; set; }   // also start the engine on launch
+    public bool AutostartEngine { get; set; }
     public bool MinimizeToTray { get; set; } = true;
     public bool StartMinimized { get; set; }
 
@@ -29,6 +33,14 @@ public sealed class AppSettings
     /// so games/apps not in any list never break. When true, all other TLS/QUIC is desynced too
     /// (kept safe by the exclude list); convenient but may break a game/app that isn't excluded.</summary>
     public bool BypassAllSites { get; set; }
+
+    /// <summary>Normalize values after deserialization to guard against corrupt/invalid JSON.</summary>
+    public AppSettings Normalize()
+    {
+        // Clamp version to known range for forward-compatible migrations.
+        if (SettingsVersion < 1) SettingsVersion = 1;
+        return this;
+    }
 }
 
 /// <summary>Loads/saves <see cref="AppSettings"/> as settings.json.</summary>
@@ -45,8 +57,6 @@ public sealed class SettingsService
         try
         {
             AppPaths.EnsureCreated();
-            // Temp-file + atomic replace: a crash mid-write can't corrupt settings.json (which Load
-            // would then reject, resetting every setting to defaults).
             string tmp = AppPaths.SettingsFile + ".tmp";
             File.WriteAllText(tmp, JsonSerializer.Serialize(Settings, JsonOpts));
             File.Move(tmp, AppPaths.SettingsFile, overwrite: true);
@@ -59,14 +69,20 @@ public sealed class SettingsService
         try
         {
             if (File.Exists(AppPaths.SettingsFile))
-                Settings = JsonSerializer.Deserialize<AppSettings>(
-                    File.ReadAllText(AppPaths.SettingsFile)) ?? new AppSettings();
+            {
+                var loaded = JsonSerializer.Deserialize<AppSettings>(
+                    File.ReadAllText(AppPaths.SettingsFile));
+                if (loaded is not null)
+                {
+                    Settings = loaded.Normalize();
+                    return;
+                }
+            }
         }
         catch
         {
-            Settings = new AppSettings();
-            // Preserve the unreadable file instead of overwriting it on the next Save.
             try { File.Move(AppPaths.SettingsFile, AppPaths.SettingsFile + ".bak", overwrite: true); } catch { }
         }
+        Settings = new AppSettings();
     }
 }

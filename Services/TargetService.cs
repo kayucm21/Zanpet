@@ -1,7 +1,5 @@
 using System.IO;
 using System.Net;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Text.Json;
 using ZapretUI.Models;
@@ -23,13 +21,11 @@ public sealed class TargetService
     private const string Prefix = "target-";
     public const string AggregateName = "targets";
 
-    private readonly HttpClient _http;
+    private static HttpClient Http => HttpFactory.General;
 
     public TargetService()
     {
         AppPaths.EnsureCreated();
-        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
-        _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("ZapretUI", "1.0"));
     }
 
     private static string PathFor(string name) => Path.Combine(AppPaths.ListsDir, Prefix + name + ".txt");
@@ -159,7 +155,7 @@ public sealed class TargetService
         try
         {
             string url = $"https://crt.sh/?q=%25.{Uri.EscapeDataString(root)}&output=json";
-            using var resp = await _http.GetAsync(url, ct).ConfigureAwait(false);
+            using var resp = await Http.GetAsync(url, ct).ConfigureAwait(false);
             resp.EnsureSuccessStatusCode();
             await using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);

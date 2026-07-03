@@ -1,10 +1,6 @@
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
@@ -16,8 +12,9 @@ namespace ZapretUI.Services;
 public sealed class VpnService : IDisposable
 {
     private Process? _proc;
-    private readonly HttpClient _http;
     private string? _savedDns;
+
+    private static HttpClient Http => HttpFactory.General;
 
     public bool IsConnected => _proc is { HasExited: false };
 
@@ -30,13 +27,6 @@ public sealed class VpnService : IDisposable
 
     private const string XrayReleaseApi = "https://api.github.com/repos/XTLS/Xray-core/releases/latest";
     public const string VpnSubscriptionUrl = "https://tepaqq.mooo.com/s/V9UygbKuEvfjSy0KYPIgH3sLSQbXo6l-6_LCrTAjwrm208Cy/VPN/b64";
-
-    public VpnService()
-    {
-        _http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("ZapretUI", "2.2"));
-        _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-    }
 
     // ---- subscription parsing ----
 
@@ -108,7 +98,7 @@ public sealed class VpnService : IDisposable
 
     public async Task<List<VpnServer>> FetchSubscriptionAsync(string url, CancellationToken ct = default)
     {
-        using var resp = await _http.GetAsync(url, ct).ConfigureAwait(false);
+        using var resp = await Http.GetAsync(url, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
         string raw = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         File.WriteAllText(SubCachePath, raw, Encoding.UTF8);
@@ -144,7 +134,7 @@ public sealed class VpnService : IDisposable
     {
         Directory.CreateDirectory(XrayDir);
 
-        using var resp = await _http.GetAsync(XrayReleaseApi, ct).ConfigureAwait(false);
+        using var resp = await Http.GetAsync(XrayReleaseApi, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
 
@@ -163,7 +153,7 @@ public sealed class VpnService : IDisposable
         if (zipUrl is null) throw new InvalidOperationException("Не найден xray-core для Windows x64.");
 
         string zipPath = Path.Combine(Path.GetTempPath(), "xray-core.zip");
-        using (var dl = await _http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
+        using (var dl = await Http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
         {
             dl.EnsureSuccessStatusCode();
             long total = dl.Content.Headers.ContentLength ?? 0;
@@ -230,7 +220,6 @@ public sealed class VpnService : IDisposable
             stream.ReadTimeout = 8000;
             stream.WriteTimeout = 5000;
 
-            // HTTP proxy requires ABSOLUTE URL in request line
             string request = "GET http://www.gstatic.com/generate_204 HTTP/1.1\r\nHost: www.gstatic.com\r\nProxy-Connection: close\r\nConnection: close\r\n\r\n";
             byte[] reqBytes = Encoding.ASCII.GetBytes(request);
             await stream.WriteAsync(reqBytes, cts.Token).ConfigureAwait(false);
@@ -247,7 +236,7 @@ public sealed class VpnService : IDisposable
             }
 
             string response = Encoding.ASCII.GetString(buf, 0, totalRead);
-            return response.Contains("204") || response.Contains("200") || response.Contains("301") || response.Contains("302") || response.Contains("204");
+            return response.Contains("204") || response.Contains("200") || response.Contains("301") || response.Contains("302");
         }
         catch { return false; }
     }
@@ -283,12 +272,9 @@ public sealed class VpnService : IDisposable
         var sb = new StringBuilder();
         sb.AppendLine("{");
         sb.AppendLine("  \"log\": { \"loglevel\": \"warning\" },");
-
-        // Minimal DNS — just like v2rayN
         sb.AppendLine("  \"dns\": {");
         sb.AppendLine("    \"servers\": [\"1.1.1.1\", \"8.8.8.8\"]");
         sb.AppendLine("  },");
-
         sb.AppendLine("  \"inbounds\": [");
         sb.AppendLine("    {");
         sb.AppendLine("      \"port\": 10808,");
@@ -303,8 +289,6 @@ public sealed class VpnService : IDisposable
         sb.AppendLine("    }");
         sb.AppendLine("  ],");
         sb.AppendLine("  \"outbounds\": [");
-
-        // main proxy outbound
         sb.AppendLine("    {");
         sb.AppendLine("      \"protocol\": \"vless\",");
         sb.AppendLine("      \"settings\": {");
@@ -317,7 +301,6 @@ public sealed class VpnService : IDisposable
         sb.AppendLine("          }]");
         sb.AppendLine("        }]");
         sb.AppendLine("      },");
-
         sb.AppendLine("      \"streamSettings\": {");
         sb.AppendLine($"        \"network\": \"{server.Network}\",");
         sb.AppendLine($"        \"security\": \"{server.Security}\"");
@@ -332,23 +315,16 @@ public sealed class VpnService : IDisposable
             sb.AppendLine("        }");
         }
 
-        if (server.Network == "tcp" || server.Network == "grpc")
-        {
-            // nothing extra needed
-        }
-        else if (server.Network == "xhttp")
+        if (server.Network == "xhttp")
         {
             sb.AppendLine("        ,\"xhttpSettings\": {");
             string mode = !string.IsNullOrEmpty(server.Mode) ? server.Mode : "auto";
             sb.AppendLine($"          \"mode\": \"{Esc(mode)}\"");
-
-            // Path: prefer Spx if meaningful, otherwise fall back to Path
             string xPath = server.Spx;
             if (string.IsNullOrEmpty(xPath) || xPath == "/")
                 xPath = server.Path;
             if (!string.IsNullOrEmpty(xPath))
                 sb.AppendLine($"          ,\"path\": \"{Esc(xPath)}\"");
-
             string host = !string.IsNullOrEmpty(server.Host) ? server.Host : server.Sni;
             if (!string.IsNullOrEmpty(host))
                 sb.AppendLine($"          ,\"host\": \"{Esc(host)}\"");
@@ -368,9 +344,7 @@ public sealed class VpnService : IDisposable
         sb.AppendLine("      },");
         sb.AppendLine("      \"tag\": \"proxy\"");
         sb.AppendLine("    },");
-
         sb.AppendLine("    { \"protocol\": \"freedom\", \"tag\": \"direct\" }");
-
         sb.AppendLine("  ]");
         sb.AppendLine("}");
 
@@ -418,7 +392,6 @@ public sealed class VpnService : IDisposable
         proc.BeginErrorReadLine();
         _proc = proc;
 
-        // Give xray a moment to bind port 53 before we switch DNS to it
         Thread.Sleep(500);
         _savedDns = SaveAndSetDns();
         SetSystemProxy("127.0.0.1", 10809, 10808, server.Address);
@@ -443,9 +416,6 @@ public sealed class VpnService : IDisposable
     }
 
     // ---- system proxy (Windows) ----
-    //
-    // HAPP-style: simple HTTP proxy via registry + WinHTTP + InternetSetOption broadcast.
-    // No PAC file (blocked by browsers), no SOCKS in ProxyServer (not supported).
 
     private static void SetSystemProxy(string host, int httpPort, int socksPort, string? vpnServerIp = null)
     {
@@ -453,7 +423,6 @@ public sealed class VpnService : IDisposable
         {
             string proxyOverride = BuildProxyOverride(vpnServerIp);
 
-            // 1) Registry — Internet Settings (per-user)
             using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
                 @"Software\Microsoft\Windows\CurrentVersion\Internet Settings", true))
             {
@@ -465,10 +434,8 @@ public sealed class VpnService : IDisposable
                 }
             }
 
-            // 2) WinHTTP (for apps that use WinHTTP instead of WinINet)
             RunCmd("netsh", $"winhttp set proxy proxy-server=\"http={host}:{httpPort};https={host}:{httpPort}\" bypass-list=\"{proxyOverride.Replace(";", " ")}\"");
 
-            // 3) Notify all running apps (INTERNET_OPTION_SETTINGS_CHANGED + INTERNET_OPTION_REFRESH)
             InternetSetOption(0, 39, IntPtr.Zero, 0);
             InternetSetOption(0, 37, IntPtr.Zero, 0);
         }
@@ -479,7 +446,6 @@ public sealed class VpnService : IDisposable
     {
         try
         {
-            // 1) Registry
             using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
                 @"Software\Microsoft\Windows\CurrentVersion\Internet Settings", true))
             {
@@ -489,17 +455,15 @@ public sealed class VpnService : IDisposable
                 }
             }
 
-            // 2) WinHTTP
             RunCmd("netsh", "winhttp reset proxy");
 
-            // 3) Notify all running apps
             InternetSetOption(0, 39, IntPtr.Zero, 0);
             InternetSetOption(0, 37, IntPtr.Zero, 0);
         }
         catch { }
     }
 
-    // ---- system DNS (route DNS through VPN tunnel) ----
+    // ---- system DNS ----
 
     private string? SaveAndSetDns()
     {
@@ -515,12 +479,10 @@ public sealed class VpnService : IDisposable
             string adapterId = adapter.Id;
             string adapterName = adapter.Name;
 
-            // Save current DNS
             string? savedDns = GetCurrentDns(adapterId);
 
-            // Set DNS to 1.1.1.1 (Cloudflare, fast and reliable)
             RunCmd("netsh", $"interface ip set dns name=\"{adapterName}\" static 1.1.1.1 primary");
-            LogLine?.Invoke($"[vpn] DNS → 1.1.1.1 (адаптер: {adapterName})");
+            LogLine?.Invoke($"[vpn] DNS -> 1.1.1.1 (адаптер: {adapterName})");
             return savedDns;
         }
         catch (Exception ex)
@@ -540,12 +502,12 @@ public sealed class VpnService : IDisposable
             if (string.IsNullOrEmpty(savedDns))
             {
                 RunCmd("netsh", $"interface ip set dns name=\"{adapter.Name}\" dhcp");
-                LogLine?.Invoke($"[vpn] DNS → DHCP (адаптер: {adapter.Name})");
+                LogLine?.Invoke($"[vpn] DNS -> DHCP (адаптер: {adapter.Name})");
             }
             else
             {
                 RunCmd("netsh", $"interface ip set dns name=\"{adapter.Name}\" static {savedDns} primary");
-                LogLine?.Invoke($"[vpn] DNS → {savedDns} (адаптер: {adapter.Name})");
+                LogLine?.Invoke($"[vpn] DNS -> {savedDns} (адаптер: {adapter.Name})");
             }
         }
         catch (Exception ex)
@@ -622,6 +584,5 @@ public sealed class VpnService : IDisposable
     public void Dispose()
     {
         Stop();
-        _http.Dispose();
     }
 }

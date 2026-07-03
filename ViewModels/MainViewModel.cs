@@ -379,8 +379,7 @@ public sealed class MainViewModel : ObservableObject
         AppendLog("Авто-починка: обход перестал отвечать, перезапускаю.");
         if (IsRunning)
         {
-            _engine.Stop();
-            await Task.Delay(1000);
+            await _engine.StopAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
         }
         if (CanStart) Start();
         if (IsRunning)
@@ -656,11 +655,9 @@ public sealed class MainViewModel : ObservableObject
         if (SelectedPreset is null) return;
         if (!IsRunning) { if (CanStart) Start(); return; }
 
-        AppendLog($"Смена стратегии → «{SelectedPreset.Name}». Перезапуск движка…");
-        _engine.Stop();
-        for (int i = 0; i < 60 && State != EngineState.Stopped; i++)
-            await Task.Delay(50);
-        await Task.Delay(250);
+        AppendLog($"Смена стратегии -> «{SelectedPreset.Name}». Перезапуск движка…");
+        await _engine.StopAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+        await Task.Delay(250).ConfigureAwait(false);
         if (CanStart) Start();
     }
 
@@ -743,7 +740,7 @@ public sealed class MainViewModel : ObservableObject
 
     public void Shutdown()
     {
-        try { _monitor.Stop(); } catch { }
+        try { _monitor.Dispose(); } catch { }
         try { _vpn.Dispose(); } catch { }
         try { _engine.Dispose(); } catch { }
     }
