@@ -36,7 +36,7 @@
 - **Обход DPI** — старт/стоп одной кнопкой, автоподбор стратегии, готовые пресеты.
 - **Встроенный VPN** — VLESS/REALITY через xray-core, подписка с серверами, пинг, автообновление.
 - **Автообновление** — проверка обновлений приложения и движка с GitHub, скачивание и установка одной кнопкой.
-- **Тёмная тема** с голубым акцентом.
+- **Тёмная тема** (по умолчанию) и **светлая тема** — переключение в настройках.
 
 ---
 
@@ -80,6 +80,8 @@ dotnet publish ZapretUI.csproj -c Release -r win-x64 --self-contained -o publish
 - `Services/` — EngineService, VpnService, UpdaterService, PresetService, HttpFactory и др.
 - `ViewModels/MainViewModel.cs` — MVVM координатор.
 - `Themes/Theme.xaml` — тёмная тема.
+- `Themes/LightTheme.xaml` — светлая тема.
+- `Services/ThemeManager.cs` — динамическое переключение тем.
 - `MainWindow.xaml` — окно: заголовок, вкладки (Главная · Стратегии · Настройки · VPN · Журнал).
 
 ## Лицензия
