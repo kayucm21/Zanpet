@@ -191,6 +191,14 @@ public sealed class PresetService
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
         });
+        a.Add("--new");
+        a.AddRange(new[] {
+            "--filter-tcp=443",
+            "{IPSET:telegram}",
+            "{IPSET_EXCLUDE:ru}",
+            "--out-range=-d7",
+            "--lua-desync=multisplit:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20",
+        });
 
         return a;
     }
@@ -224,6 +232,12 @@ public sealed class PresetService
             "--filter-udp=19294-19344,50000-65535",
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=3",
+            "--new",
+            "--filter-tcp=443",
+            "{IPSET:telegram}",
+            "{IPSET_EXCLUDE:ru}",
+            "--out-range=-d7",
+            "--lua-desync=multisplit:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20",
         };
     }
 
@@ -259,6 +273,12 @@ public sealed class PresetService
             "--filter-udp=19294-19344,50000-65535",
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
+            "--new",
+            "--filter-tcp=443",
+            "{IPSET:telegram}",
+            "{IPSET_EXCLUDE:ru}",
+            "--out-range=-d7",
+            "--lua-desync=multisplit:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20",
         };
     }
 
@@ -290,6 +310,12 @@ public sealed class PresetService
             "--filter-udp=19294-19344,50000-65535",
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
+            "--new",
+            "--filter-tcp=443",
+            "{IPSET:telegram}",
+            "{IPSET_EXCLUDE:ru}",
+            "--out-range=-d7",
+            "--lua-desync=multisplit:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20",
         };
     }
 
@@ -322,6 +348,12 @@ public sealed class PresetService
             "--filter-udp=19294-19344,50000-65535",
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
+            "--new",
+            "--filter-tcp=443",
+            "{IPSET:telegram}",
+            "{IPSET_EXCLUDE:ru}",
+            "--out-range=-d7",
+            "--lua-desync=multisplit:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20",
         };
     }
 }

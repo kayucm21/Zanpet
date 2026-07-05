@@ -88,8 +88,15 @@ public sealed class HostlistService
         Write("youtube", string.Join('\n', DefaultYoutube));
         Write("discord", string.Join('\n', DefaultDiscord));
         Write("telegram", string.Join('\n', DefaultTelegram));
-        Write("exclude", string.Join('\n', DefaultExclude));
-        Write("general", string.Join('\n', DefaultGeneral));
+        Write("exclude",  string.Join('\n', DefaultExclude));
+        Write("general",  string.Join('\n', DefaultGeneral));
+        WriteIpset("telegram", string.Join('\n', DefaultTelegramIpset));
+    }
+
+    private void WriteIpset(string name, string content)
+    {
+        AppPaths.EnsureCreated();
+        File.WriteAllText(Path.Combine(AppPaths.ListsDir, "ipset-" + name + ".txt"), NormalizeNewlines(content));
     }
 
     // ---- bundled default lists (synced from Flowseal/zapret-discord-youtube, июнь 2026) ----
@@ -133,6 +140,21 @@ public sealed class HostlistService
         "tg.dev", "tg.org", "tgram.org", "torg.org", "telegramapp.org",
         "cdn-telegram.org", "telegram-cdn.org", "tdesktop.com",
         "telegram.space", "telega.one",
+    };
+
+    /// <summary>Telegram DC IP ranges (CIDR) for MTProto traffic. The desktop/mobile app's
+    /// media goes directly to these DCs over TCP 443 — no SNI, so a domain hostlist won't help.</summary>
+    private static readonly string[] DefaultTelegramIpset =
+    {
+        "91.108.4.0/22",
+        "91.108.8.0/22",
+        "91.108.12.0/22",
+        "91.108.16.0/22",
+        "91.108.20.0/22",
+        "91.108.32.0/20",
+        "91.108.56.0/22",
+        "149.154.160.0/20",
+        "185.76.151.0/24",
     };
 
     /// <summary>General "everything else worth bypassing" domains (Flowseal list-general.txt, the
