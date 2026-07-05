@@ -263,20 +263,20 @@ public sealed class UpdaterService
             bat.AppendLine($"timeout /t 2 /nobreak >nul");
             // Verify the new exe exists before starting
             bat.AppendLine($"if exist \"{selfExe}\" (");
-            bat.AppendLine($"  echo Starting new exe... >> \"{logPath}\"");
+            bat.AppendLine($"  echo New exe OK, starting... >> \"{logPath}\"");
             bat.AppendLine($"  start \"\" \"{selfExe}\" --launched-after-update");
+            bat.AppendLine($"  timeout /t 3 /nobreak >nul");
+            bat.AppendLine($"  del /Q \"{oldExe}\" >nul 2>&1");
             bat.AppendLine($") else (");
-            bat.AppendLine($"  echo ERROR: exe not found after copy: {selfExe} >> \"{logPath}\"");
-            bat.AppendLine($"  echo Trying fallback path... >> \"{logPath}\"");
-            bat.AppendLine($"  if exist \"{exeDir}\\{exeName}\" (");
-            bat.AppendLine($"    start \"\" \"{exeDir}\\{exeName}\" --launched-after-update");
+            bat.AppendLine($"  echo New exe NOT found, restoring old exe >> \"{logPath}\"");
+            bat.AppendLine($"  ren \"{oldExe}\" \"{exeName}\" >nul 2>&1");
+            bat.AppendLine($"  if exist \"{selfExe}\" (");
+            bat.AppendLine($"    start \"\" \"{selfExe}\" --launched-after-update");
             bat.AppendLine($"  ) else (");
-            bat.AppendLine($"    echo FATAL: cannot find exe anywhere >> \"{logPath}\"");
+            bat.AppendLine($"    echo FATAL: no exe found >> \"{logPath}\"");
             bat.AppendLine($"  )");
             bat.AppendLine($")");
-            // Cleanup: delete old exe and temp files
-            bat.AppendLine($"timeout /t 3 /nobreak >nul");
-            bat.AppendLine($"del /Q \"{oldExe}\" >nul 2>&1");
+            // Cleanup: delete temp files (old exe already handled above)
             bat.AppendLine($"del /Q \"{zipPath}\" >nul 2>&1");
             bat.AppendLine($"rmdir /S /Q \"{stageDir}\" >nul 2>&1");
             bat.AppendLine($"del /Q \"%~f0\" >nul 2>&1");
