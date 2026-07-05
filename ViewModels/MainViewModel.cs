@@ -594,7 +594,7 @@ zapret2 v1.0.2 (движок 2.0.0).
             AppendLog("Проверка обновлений…");
 
             // --- 1. Check engine update (bol-van/zapret2) ---
-            ReleaseInfo latest;
+            ReleaseInfo? latest = null;
             try
             {
                 latest = await _updater.FetchLatestAsync();
@@ -609,52 +609,57 @@ zapret2 v1.0.2 (движок 2.0.0).
                 AppendLog(msg);
                 if (!silent)
                     MessageBox.Show(msg, "Обновление движка", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
             }
 
-            bool needsUpdate = !_updater.IsEngineInstalled || _updater.IsUpdateAvailable(latest);
-            if (needsUpdate)
+            if (latest is not null)
             {
-                AppendLog($"Доступно обновление движка: {latest.Tag}. Загрузка…");
-                bool wasRunning = IsRunning;
-                if (wasRunning)
+                bool needsUpdate = !_updater.IsEngineInstalled || _updater.IsUpdateAvailable(latest);
+                if (needsUpdate)
                 {
-                    AppendLog("Остановка движка для обновления…");
-                    _engine.Stop();
-                    await Task.Delay(800);
-                }
+                    AppendLog($"Доступно обновление движка: {latest.Tag}. Загрузка…");
+                    bool wasRunning = IsRunning;
+                    if (wasRunning)
+                    {
+                        AppendLog("Остановка движка для обновления…");
+                        _engine.Stop();
+                        await Task.Delay(800);
+                    }
 
-                var progress = new Progress<UpdateProgress>(p =>
-                {
-                    UpdateProgress = p.Fraction;
-                    UpdateStatus = p.Message;
-                    AppendLog(p.Message);
-                });
-                try
-                {
-                    await _updater.InstallAsync(latest, progress);
-                }
-                catch (Exception ex)
-                {
-                    UpdateStatus = $"Не удалось установить движок: {ex.Message}";
-                    AppendLog("Ошибка загрузки движка: " + ex.Message);
-                    if (!silent)
-                        MessageBox.Show($"Ошибка загрузки движка: {ex.Message}", "Обновление", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-                EngineVersion = _updater.InstalledVersionDisplay ?? "—";
-                UpdateStatus = $"Движок обновлён: {latest.Tag}";
-                AppendLog($"Движок обновлён: {latest.Tag}");
-                OnPropertyChanged(nameof(CanStart));
-                RaiseCommandStates();
+                    var progress = new Progress<UpdateProgress>(p =>
+                    {
+                        UpdateProgress = p.Fraction;
+                        UpdateStatus = p.Message;
+                        AppendLog(p.Message);
+                    });
+                    try
+                    {
+                        await _updater.InstallAsync(latest, progress);
+                    }
+                    catch (Exception ex)
+                    {
+                        UpdateStatus = $"Не удалось установить движок: {ex.Message}";
+                        AppendLog("Ошибка загрузки движка: " + ex.Message);
+                        if (!silent)
+                            MessageBox.Show($"Ошибка загрузки движка: {ex.Message}", "Обновление", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
 
-                if (wasRunning && CanStart) Start();
-            }
-            else
-            {
-                string installed = _updater.InstalledVersion ?? "—";
-                UpdateStatus = $"Движок актуален: {installed} (GitHub: {latest.Tag})";
-                AppendLog($"Движок актуален: {installed} (GitHub: {latest.Tag})");
+                    if (_updater.IsEngineInstalled)
+                    {
+                        EngineVersion = _updater.InstalledVersionDisplay ?? "—";
+                        UpdateStatus = $"Движок обновлён: {latest.Tag}";
+                        AppendLog($"Движок обновлён: {latest.Tag}");
+                        OnPropertyChanged(nameof(CanStart));
+                        RaiseCommandStates();
+
+                        if (wasRunning && CanStart) Start();
+                    }
+                }
+                else
+                {
+                    string installed = _updater.InstalledVersion ?? "—";
+                    UpdateStatus = $"Движок актуален: {installed} (GitHub: {latest.Tag})";
+                    AppendLog($"Движок актуален: {installed} (GitHub: {latest.Tag})");
+                }
             }
 
             // --- 2. Check app update (kayucm21/Zanpet) ---
@@ -1035,7 +1040,7 @@ zapret2 v1.0.2 (движок 2.0.0).
     private void ReloadPresets()
     {
         Presets.Clear();
-        foreach (var p in _presets.All) Presets.Add(p);
+        foreach (var p in _presets.All.Where(p => p.IsBuiltIn)) Presets.Add(p);
         OnPropertyChanged(nameof(RecommendedPreset));
     }
 
