@@ -460,6 +460,10 @@ public sealed class MainViewModel : ObservableObject
         bool launchedAfterUpdate = Environment.GetCommandLineArgs()
             .Any(a => a.Equals("--launched-after-update", StringComparison.OrdinalIgnoreCase));
 
+        // Clear cooldown if update succeeded (bat launched us with the flag)
+        if (launchedAfterUpdate)
+            _updater.ClearUpdateCooldown();
+
         // Copy engine binaries + data from ClassicData FIRST so the engine
         // check below finds winws2.exe without needing GitHub on a fresh install.
         AutoImportClassicPresets(launchedAfterUpdate);
@@ -474,11 +478,12 @@ public sealed class MainViewModel : ObservableObject
 
         EngineVersion = _updater.InstalledVersionDisplay ?? "не установлен";
 
-        // Skip app update check if just launched after update (prevent loop)
-        // but still check engine if not installed
-        if (launchedAfterUpdate)
+        // Skip app update check if recently updated (cooldown 10 min)
+        // This prevents the update loop: bat fails → old exe runs → checks again
+        bool recentlyUpdated = _updater.IsRecentlyUpdated();
+        if (recentlyUpdated)
         {
-            AppendLog("Запуск после обновления — пропускаю проверку обновлений.");
+            AppendLog("Обновление было недавно — пропускаю проверку (cooldown 10 мин).");
         }
         else if (!_updater.IsEngineInstalled || !_updater.IsEngineComplete)
         {

@@ -150,9 +150,45 @@ public sealed class UpdaterService
         return null;
     }
 
+    /// <summary>Cooldown file: prevents re-downloading an update that just failed to install.</summary>
+    private static string UpdateCooldownFile => Path.Combine(AppPaths.Root, "update_cooldown.txt");
+
+    /// <summary>Returns true if an update attempt was made less than 10 minutes ago.</summary>
+    public bool IsRecentlyUpdated()
+    {
+        try
+        {
+            if (!File.Exists(UpdateCooldownFile)) return false;
+            string text = File.ReadAllText(UpdateCooldownFile).Trim();
+            if (DateTime.TryParse(text, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var ts))
+                return (DateTime.UtcNow - ts).TotalMinutes < 10;
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>Write current timestamp to cooldown file.</summary>
+    private static void WriteCooldown()
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.Root);
+            File.WriteAllText(UpdateCooldownFile, DateTime.UtcNow.ToString("o"));
+        }
+        catch { }
+    }
+
+    /// <summary>Clear cooldown file after a successful update.</summary>
+    public void ClearUpdateCooldown()
+    {
+        try { if (File.Exists(UpdateCooldownFile)) File.Delete(UpdateCooldownFile); } catch { }
+    }
+
     /// <summary>Download app update, extract, replace files and restart.</summary>
     public async Task InstallAppUpdateAsync(string tag, IProgress<double>? progress = null, CancellationToken ct = default)
     {
+        WriteCooldown();
         string? zipUrl = await FetchAppZipUrlAsync(tag, ct).ConfigureAwait(false);
 
         // Build fallback URLs: GitHub primary → Yandex Disk → CDN
@@ -270,11 +306,7 @@ public sealed class UpdaterService
             bat.AppendLine($") else (");
             bat.AppendLine($"  echo New exe NOT found, restoring old exe >> \"{logPath}\"");
             bat.AppendLine($"  ren \"{oldExe}\" \"{exeName}\" >nul 2>&1");
-            bat.AppendLine($"  if exist \"{selfExe}\" (");
-            bat.AppendLine($"    start \"\" \"{selfExe}\" --launched-after-update");
-            bat.AppendLine($"  ) else (");
-            bat.AppendLine($"    echo FATAL: no exe found >> \"{logPath}\"");
-            bat.AppendLine($"  )");
+            bat.AppendLine($"  echo Copy failed, NOT starting old exe to prevent update loop >> \"{logPath}\"");
             bat.AppendLine($")");
             // Cleanup: delete temp files (old exe already handled above)
             bat.AppendLine($"del /Q \"{zipPath}\" >nul 2>&1");
