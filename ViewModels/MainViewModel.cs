@@ -480,8 +480,64 @@ public sealed class MainViewModel : ObservableObject
         else if (Settings.AutoUpdateEngine)
             await CheckAndUpdateAsync(silent: true);
 
+        // Show changelog if version changed
+        ShowChangelogIfUpdated();
+
         if (Settings.AutostartEngine && CanStart && SelectedPreset is not null)
             Start();
+    }
+
+    private void ShowChangelogIfUpdated()
+    {
+        string currentVersion = UpdaterService.AppVersion;
+        string lastSeen = Settings.LastSeenVersion ?? "";
+
+        if (string.Equals(currentVersion, lastSeen, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        // First launch ever — just mark as seen, don't show
+        if (string.IsNullOrEmpty(lastSeen))
+        {
+            Settings.LastSeenVersion = currentVersion;
+            _settingsSvc.Save();
+            return;
+        }
+
+        // Version changed — show changelog
+        string changelog = GetEmbeddedChangelog();
+
+        Settings.LastSeenVersion = currentVersion;
+        _settingsSvc.Save();
+
+        System.Windows.Application.Current.Dispatcher.BeginInvoke(() =>
+        {
+            var win = new ChangelogWindow(currentVersion, changelog);
+            win.ShowDialog();
+        });
+    }
+
+    private static string GetEmbeddedChangelog()
+    {
+        return @"✦ Исправлен кросс-поточный вылет
+При запуске движка приложение больше не падает с ошибкой «Вызывающий поток не может получить доступ к данному объекту».
+
+✦ Стратегии снова работают
+Все пресеты (Multidisorder, FakeSplit, TCP Segmentation, OOB Injection) запускаются корректно.
+
+✦ VPN: добавлена поддержка grpc
+Новый сервер Irkutsk (grpc протокол) заменил Moscow.
+
+✦ Движок обновлён
+zapret2 v1.0.2 (движок 2.0.0) — Lua-скрипты и фильтры обновлены.
+
+✦ Светлая тема
+Переключение в Настройки → Тема оформления.
+
+✦ Самобновление улучшено
+robocopy вместо xcopy, web-фолбэк для api.github.com, лог ошибок.
+
+✦ Убран мусор из дистрибутива
+ZIP уменьшен: только ZapretUI.exe + ClassicData/.";
     }
 
     private void AutoImportClassicPresets(bool force = false)

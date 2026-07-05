@@ -37,6 +37,9 @@ public sealed class AppSettings
     /// <summary>Theme mode: "dark" (default) or "light".</summary>
     public string Theme { get; set; } = "dark";
 
+    /// <summary>Last app version the user saw the changelog for. Empty = never shown.</summary>
+    public string LastSeenVersion { get; set; } = "";
+
     /// <summary>Normalize values after deserialization to guard against corrupt/invalid JSON.</summary>
     public AppSettings Normalize()
     {
