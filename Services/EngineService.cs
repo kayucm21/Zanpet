@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
+using System.Threading;
 using ZapretUI.Models;
 
 namespace ZapretUI.Services;
@@ -16,6 +17,7 @@ public enum EngineState { Stopped, Running, Starting, Stopping }
 public sealed class EngineService : IDisposable
 {
     private readonly object _lock = new();
+    private readonly SynchronizationContext? _uiCtx;
     private Process? _proc;
     private StreamWriter? _logFile;
     // Job object with KILL_ON_JOB_CLOSE: winws2 is assigned to it so the OS terminates the engine
@@ -24,6 +26,11 @@ public sealed class EngineService : IDisposable
     private IntPtr _job = IntPtr.Zero;
 
     public EngineState State { get; private set; } = EngineState.Stopped;
+
+    public EngineService()
+    {
+        _uiCtx = SynchronizationContext.Current;
+    }
 
     /// <summary>Flowseal-style game filter: widen the WF capture to all high ports (&gt;1023) when true.
     /// Set from settings by the VM; consumed by <see cref="Start"/> and the {WF_TCP}/{WF_UDP} tokens.</summary>
@@ -381,9 +388,10 @@ public sealed class EngineService : IDisposable
 
             _proc = proc;
             ActivePreset = preset;
-            SetState(EngineState.Running);
-            Emit($"=== Запущен пресет «{preset.Name}» (PID {proc.Id}) ===");
         }
+        // Notify OUTSIDE the lock to avoid deadlock with OnProcessExited / Dispatcher.Invoke.
+        SetState(EngineState.Running);
+        Emit($"=== Запущен пресет «{preset.Name}» ===");
     }
 
     public void Stop()
@@ -492,7 +500,10 @@ public sealed class EngineService : IDisposable
     private void Emit(string line)
     {
         try { _logFile?.WriteLine(line); _logFile?.Flush(); } catch { }
-        LogLine?.Invoke(line);
+        var handler = LogLine;
+        if (handler is null) return;
+        if (_uiCtx is not null) _uiCtx.Post(_ => handler(line), null);
+        else handler(line);
     }
 
     private void OpenLogFile(Preset preset)
@@ -517,7 +528,10 @@ public sealed class EngineService : IDisposable
     private void SetState(EngineState s)
     {
         State = s;
-        StateChanged?.Invoke(s);
+        var handler = StateChanged;
+        if (handler is null) return;
+        if (_uiCtx is not null) _uiCtx.Post(_ => handler(s), null);
+        else handler(s);
     }
 
     public void Dispose()

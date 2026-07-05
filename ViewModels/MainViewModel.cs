@@ -393,7 +393,7 @@ public sealed class MainViewModel : ObservableObject
         AppendLog("Авто-починка: обход перестал отвечать, перезапускаю.");
         if (IsRunning)
         {
-            await _engine.StopAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+            await _engine.StopAsync(TimeSpan.FromSeconds(3));
         }
         if (CanStart) Start();
         if (IsRunning)
@@ -745,8 +745,8 @@ zapret2 v1.0.2 (движок 2.0.0).
         if (!IsRunning) { if (CanStart) Start(); return; }
 
         AppendLog($"Смена стратегии -> «{SelectedPreset.Name}». Перезапуск движка…");
-        await _engine.StopAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
-        await Task.Delay(250).ConfigureAwait(false);
+        await _engine.StopAsync(TimeSpan.FromSeconds(3));
+        await Task.Delay(250);
         if (CanStart) Start();
     }
 
@@ -1035,6 +1035,6 @@ zapret2 v1.0.2 (движок 2.0.0).
         var app = Application.Current;
         if (app is null) { a(); return; }
         if (app.Dispatcher.CheckAccess()) a();
-        else app.Dispatcher.Invoke(a);
+        else app.Dispatcher.BeginInvoke(a);
     }
 }
