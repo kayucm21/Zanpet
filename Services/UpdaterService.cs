@@ -176,33 +176,59 @@ public sealed class UpdaterService
             string batPath = Path.Combine(Path.GetTempPath(), "ZapretUI-update.bat");
             string selfExe = Environment.ProcessPath ?? Path.Combine(exeDir, "ZapretUI.exe");
             string logPath = Path.Combine(Path.GetTempPath(), "ZapretUI-update.log");
+            string oldExe = Path.Combine(exeDir, "ZapretUI_old.exe");
+            string newExeName = Path.GetFileName(selfExe);
 
             var bat = new StringBuilder();
             bat.AppendLine("@echo off");
-            bat.AppendLine($"echo %date% %time% > \"{logPath}\"");
-            bat.AppendLine("echo Waiting for old process to exit...");
-            bat.AppendLine("timeout /t 4 /nobreak >nul");
-            bat.AppendLine($"echo Copying files from {stageDir} to {exeDir}...");
-            bat.AppendLine($"robocopy \"{stageDir}\" \"{exeDir}\" /E /Y /R:3 /W:2 >> \"{logPath}\" 2>&1");
-            bat.AppendLine($"if %ERRORLEVEL% LSS 8 (echo SUCCESS >> \"{logPath}\") else (echo COPY FAILED with code %ERRORLEVEL% >> \"{logPath}\")");
+            bat.AppendLine($"echo %date% %time% — Starting update > \"{logPath}\"");
+
+            // Wait for process to fully exit (check every 1 second, max 30s)
+            int pid = Environment.ProcessId;
+            bat.AppendLine($"echo Waiting for PID {pid} to exit...");
+            bat.AppendLine($"set /a count=0");
+            bat.AppendLine(":waitloop");
+            bat.AppendLine($"tasklist /FI \"PID eq {pid}\" 2>nul | find /i \"{pid}\" >nul");
+            bat.AppendLine($"if %ERRORLEVEL%==0 (");
+            bat.AppendLine($"  set /a count+=1");
+            bat.AppendLine($"  if %count% GEQ 30 (echo TIMEOUT waiting for exit >> \"{logPath}\" & goto copyphase)");
+            bat.AppendLine($"  timeout /t 1 /nobreak >nul");
+            bat.AppendLine($"  goto waitloop");
+            bat.AppendLine($")");
+            bat.AppendLine($"echo Process exited after %count%s >> \"{logPath}\"");
+
+            bat.AppendLine(":copyphase");
+            // Rename running exe (ren works on locked files on Windows)
+            bat.AppendLine($"if exist \"{selfExe}\" (");
+            bat.AppendLine($"  del /Q \"{oldExe}\" >nul 2>&1");
+            bat.AppendLine($"  ren \"{selfExe}\" \"ZapretUI_old.exe\" >nul 2>&1");
+            bat.AppendLine($"  echo Renamed old exe >> \"{logPath}\"");
+            bat.AppendLine($")");
+            // Copy new files
+            bat.AppendLine($"echo Copying files...");
+            bat.AppendLine($"robocopy \"{stageDir}\" \"{exeDir}\" /E /Y /R:3 /W:1 >> \"{logPath}\" 2>&1");
+            bat.AppendLine($"if %ERRORLEVEL% LSS 8 (echo COPY OK >> \"{logPath}\") else (echo COPY FAILED %ERRORLEVEL% >> \"{logPath}\")");
+            // Start new exe
+            bat.AppendLine($"echo Starting new exe...");
+            bat.AppendLine($"start \"\" \"{selfExe}\" --launched-after-update");
+            // Cleanup: delete old exe and temp files
+            bat.AppendLine($"timeout /t 3 /nobreak >nul");
+            bat.AppendLine($"del /Q \"{oldExe}\" >nul 2>&1");
             bat.AppendLine($"del /Q \"{zipPath}\" >nul 2>&1");
             bat.AppendLine($"rmdir /S /Q \"{stageDir}\" >nul 2>&1");
-            bat.AppendLine($"echo Starting {selfExe}...");
-            bat.AppendLine($"start \"\" \"{selfExe}\" --launched-after-update");
-            bat.AppendLine("timeout /t 2 /nobreak >nul");
             bat.AppendLine($"del /Q \"%~f0\" >nul 2>&1");
 
-            File.WriteAllText(batPath, bat.ToString(), Encoding.UTF8);
+            File.WriteAllText(batPath, bat.ToString(), new UTF8Encoding(false));
 
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = batPath,
                 UseShellExecute = true,
-                CreateNoWindow = true,
+                CreateNoWindow = false,
             });
 
-            // Give the bat file time to start before killing this process
-            await Task.Delay(1000);
+            // Exit this process
+            await Task.Delay(500);
             Environment.Exit(0);
         }
         catch
