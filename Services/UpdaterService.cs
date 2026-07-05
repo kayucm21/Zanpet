@@ -26,6 +26,10 @@ public sealed class UpdaterService
     private const string AppReleasesPage =
         "https://github.com/kayucm21/Zanpet/releases/latest";
 
+    /// <summary>Cloudflare R2 fallback: fast CDN download when GitHub is slow/blocked.
+    /// Format: direct ZIP URL like https://pub-xxxxx.r2.dev/ZapretUI-v2.5.3.zip</summary>
+    private const string AppCdnFallback = "";
+
     private static HttpClient Http => HttpFactory.GitHub;
 
     /// <summary>Currently installed engine tag, or null if the engine is absent.</summary>
@@ -130,6 +134,11 @@ public sealed class UpdaterService
     public async Task InstallAppUpdateAsync(string tag, IProgress<double>? progress = null, CancellationToken ct = default)
     {
         string? zipUrl = await FetchAppZipUrlAsync(tag, ct).ConfigureAwait(false);
+
+        // If GitHub URL not found, try CDN fallback
+        if (zipUrl is null && !string.IsNullOrEmpty(AppCdnFallback))
+            zipUrl = AppCdnFallback;
+
         if (zipUrl is null) throw new InvalidOperationException("Не найден zip-файл релиза.");
 
         string zipPath = Path.Combine(Path.GetTempPath(), $"ZapretUI-{tag}.zip");
@@ -138,24 +147,47 @@ public sealed class UpdaterService
         try
         {
             progress?.Report(0);
-            using (var dl = await Http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
+            bool downloaded = false;
+            Exception? lastError = null;
+
+            // Try primary URL, then fallback
+            var urls = new List<string> { zipUrl };
+            if (!string.IsNullOrEmpty(AppCdnFallback) && zipUrl != AppCdnFallback)
+                urls.Add(AppCdnFallback);
+
+            foreach (var url in urls)
             {
-                dl.EnsureSuccessStatusCode();
-                long total = dl.Content.Headers.ContentLength ?? 0;
-                await using var stream = await dl.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-                await using var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, true);
-                var buf = new byte[1 << 16];
-                long read = 0;
-                int n;
-                while ((n = await stream.ReadAsync(buf, ct).ConfigureAwait(false)) > 0)
+                try
                 {
-                    await fs.WriteAsync(buf.AsMemory(0, n), ct).ConfigureAwait(false);
-                    read += n;
-                    if (total > 0) progress?.Report((double)read / total);
+                    using var dl = await HttpFactory.General.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                    dl.EnsureSuccessStatusCode();
+                    long total = dl.Content.Headers.ContentLength ?? 0;
+                    await using var stream = await dl.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                    await using var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, true);
+                    var buf = new byte[1 << 16];
+                    long read = 0;
+                    int n;
+                    while ((n = await stream.ReadAsync(buf, ct).ConfigureAwait(false)) > 0)
+                    {
+                        await fs.WriteAsync(buf.AsMemory(0, n), ct).ConfigureAwait(false);
+                        read += n;
+                        if (total > 0)
+                        {
+                            double frac = Math.Clamp((double)read / total, 0, 1);
+                            progress?.Report(frac);
+                        }
+                    }
+                    downloaded = true;
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex;
                 }
             }
 
-            progress?.Report(1);
+            if (!downloaded)
+                throw lastError ?? new InvalidOperationException("Не удалось скачать обновление.");
             Directory.CreateDirectory(stageDir);
 
             using (var zipStream = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read))
