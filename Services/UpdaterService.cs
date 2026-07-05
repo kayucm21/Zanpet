@@ -30,6 +30,9 @@ public sealed class UpdaterService
     /// Format: direct ZIP URL like https://pub-xxxxx.r2.dev/ZapretUI-v2.5.3.zip</summary>
     private const string AppCdnFallback = "";
 
+    /// <summary>Yandex Disk public share link for app updates (fallback when GitHub is slow).</summary>
+    private const string YandexDiskShareUrl = "https://disk.yandex.ru/d/ILFbZC4Pez241w";
+
     private static HttpClient Http => HttpFactory.GitHub;
 
     /// <summary>Currently installed engine tag, or null if the engine is absent.</summary>
@@ -130,16 +133,39 @@ public sealed class UpdaterService
         return null;
     }
 
+    /// <summary>Resolve a Yandex Disk public share link to a direct download URL via the public API.</summary>
+    private static async Task<string?> ResolveYandexDiskUrlAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(YandexDiskShareUrl)) return null;
+        try
+        {
+            string api = $"https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key={Uri.EscapeDataString(YandexDiskShareUrl)}";
+            using var resp = await HttpFactory.General.GetAsync(api, ct).ConfigureAwait(false);
+            resp.EnsureSuccessStatusCode();
+            using var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false), cancellationToken: ct).ConfigureAwait(false);
+            if (doc.RootElement.TryGetProperty("href", out var href))
+                return href.GetString();
+        }
+        catch { }
+        return null;
+    }
+
     /// <summary>Download app update, extract, replace files and restart.</summary>
     public async Task InstallAppUpdateAsync(string tag, IProgress<double>? progress = null, CancellationToken ct = default)
     {
         string? zipUrl = await FetchAppZipUrlAsync(tag, ct).ConfigureAwait(false);
 
-        // If GitHub URL not found, try CDN fallback
-        if (zipUrl is null && !string.IsNullOrEmpty(AppCdnFallback))
-            zipUrl = AppCdnFallback;
+        // Build fallback URLs: GitHub primary → Yandex Disk → CDN
+        var urls = new List<string>();
+        if (zipUrl is not null) urls.Add(zipUrl);
 
-        if (zipUrl is null) throw new InvalidOperationException("Не найден zip-файл релиза.");
+        // Resolve Yandex Disk share link to actual download URL
+        string? yandexUrl = await ResolveYandexDiskUrlAsync(ct).ConfigureAwait(false);
+        if (yandexUrl is not null) urls.Add(yandexUrl);
+
+        if (!string.IsNullOrEmpty(AppCdnFallback)) urls.Add(AppCdnFallback);
+
+        if (urls.Count == 0) throw new InvalidOperationException("Не найден zip-файл релиза.");
 
         string zipPath = Path.Combine(Path.GetTempPath(), $"ZapretUI-{tag}.zip");
         string stageDir = Path.Combine(Path.GetTempPath(), $"ZapretUI-stage-{Guid.NewGuid():N}");
@@ -150,16 +176,11 @@ public sealed class UpdaterService
             bool downloaded = false;
             Exception? lastError = null;
 
-            // Try primary URL, then fallback
-            var urls = new List<string> { zipUrl };
-            if (!string.IsNullOrEmpty(AppCdnFallback) && zipUrl != AppCdnFallback)
-                urls.Add(AppCdnFallback);
-
-            foreach (var url in urls)
+            foreach (var downloadUrl in urls)
             {
                 try
                 {
-                    using var dl = await HttpFactory.General.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                    using var dl = await HttpFactory.General.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
                     dl.EnsureSuccessStatusCode();
                     long total = dl.Content.Headers.ContentLength ?? 0;
                     await using var stream = await dl.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
