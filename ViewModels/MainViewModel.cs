@@ -477,7 +477,7 @@ public sealed class MainViewModel : ObservableObject
 
         if (!_updater.IsEngineInstalled || !_updater.IsEngineComplete)
             await CheckAndUpdateAsync(silent: true);
-        else if (Settings.AutoUpdateEngine)
+        else
             await CheckAndUpdateAsync(silent: true);
 
         // Show changelog if version changed
@@ -666,31 +666,40 @@ zapret2 v1.0.2 (движок 2.0.0).
                     string appMsg = $"Доступно обновление приложения: {appInfo.Tag}";
                     UpdateStatus = appMsg;
                     AppendLog(appMsg);
-                    if (!silent)
+
+                    bool doInstall = false;
+                    if (silent)
+                    {
+                        doInstall = true;
+                    }
+                    else
                     {
                         var result = MessageBox.Show(
                             $"Доступна новая версия приложения: {appInfo.Tag}\n\nСкачать и установить?",
                             "Обновление приложения",
                             MessageBoxButton.YesNo, MessageBoxImage.Information);
-                        if (result == MessageBoxResult.Yes)
+                        if (result == MessageBoxResult.Yes) doInstall = true;
+                    }
+
+                    if (doInstall)
+                    {
+                        UpdateStatus = $"Загрузка {appInfo.Tag}…";
+                        AppendLog($"Загрузка обновления {appInfo.Tag}…");
+                        var progress = new Progress<double>(p =>
                         {
-                            UpdateStatus = $"Загрузка {appInfo.Tag}…";
-                            AppendLog($"Загрузка обновления {appInfo.Tag}…");
-                            var progress = new Progress<double>(p =>
-                            {
-                                UpdateProgress = p;
-                                UpdateStatus = $"Загрузка {appInfo.Tag}… {p:P0}";
-                            });
-                            try
-                            {
-                                await _updater.InstallAppUpdateAsync(appInfo.Tag, progress);
-                            }
-                            catch (Exception ex)
-                            {
-                                UpdateStatus = $"Ошибка обновления: {ex.Message}";
-                                AppendLog($"Ошибка обновления: {ex.Message}");
+                            UpdateProgress = p;
+                            UpdateStatus = $"Загрузка {appInfo.Tag}… {p:P0}";
+                        });
+                        try
+                        {
+                            await _updater.InstallAppUpdateAsync(appInfo.Tag, progress);
+                        }
+                        catch (Exception ex)
+                        {
+                            UpdateStatus = $"Ошибка обновления: {ex.Message}";
+                            AppendLog($"Ошибка обновления: {ex.Message}");
+                            if (!silent)
                                 MessageBox.Show($"Ошибка обновления: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                            }
                         }
                     }
                 }
