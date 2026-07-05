@@ -89,6 +89,7 @@ public sealed class VpnService : IDisposable
                 Spx = Uri.UnescapeDataString(ps["spx"] ?? ""),
                 Path = Uri.UnescapeDataString(ps["path"] ?? ""),
                 Mode = ps["mode"] ?? "",
+                ServiceName = Uri.UnescapeDataString(ps["serviceName"] ?? ""),
                 RawUri = uri,
             };
         }
@@ -116,7 +117,7 @@ public sealed class VpnService : IDisposable
     {
         var servers = new List<VpnServer>();
         string[] uris = [
-            "vless://52729ad8-eb3f-4ab8-89b7-f6715c81623f@31.76.14.166:9443?encryption=none&security=reality&sni=www.cloudflare.com&fp=safari&pbk=tr7AGu2HJSs2PMWJWVJu5Wb_j4m30D5XydUB5mJZAlE&sid=ec58f673d73750cb&type=tcp&spx=%2F#Moscow",
+            "vless://9624ed01-5908-4dac-807c-d94c4e778e9f@tepaqq.mooo.com:443?encryption=none&security=reality&sni=tepaqq.mooo.com&fp=chrome&pbk=tr7AGu2HJSs2PMWJWVJu5Wb_j4m30D5XydUB5mJZAlE&sid=b8fad4b8507063e8&type=grpc&spx=%2F&serviceName=VlessService#Irkutsk",
             "vless://3e1dad94-2e0f-4ad7-8a53-8b304397bd65@31.76.14.166:444?encryption=none&security=reality&sni=n.sni-347-default.ssl.fastly.net&fp=firefox&pbk=tr7AGu2HJSs2PMWJWVJu5Wb_j4m30D5XydUB5mJZAlE&sid=8bf978f2a63c420a&type=xhttp&spx=%2F&path=%2Fxhttp&mode=auto#Saint-Petersburg"
         ];
         foreach (var uri in uris)
@@ -329,6 +330,13 @@ public sealed class VpnService : IDisposable
             string host = !string.IsNullOrEmpty(server.Host) ? server.Host : server.Sni;
             if (!string.IsNullOrEmpty(host))
                 sb.AppendLine($"          ,\"host\": \"{Esc(host)}\"");
+            sb.AppendLine("        }");
+        }
+        else if (server.Network == "grpc")
+        {
+            sb.AppendLine("        ,\"grpcSettings\": {");
+            if (!string.IsNullOrEmpty(server.ServiceName))
+                sb.AppendLine($"          \"serviceName\": \"{Esc(server.ServiceName)}\"");
             sb.AppendLine("        }");
         }
         else if (server.Network == "ws")

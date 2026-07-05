@@ -29,7 +29,7 @@ public sealed class MainViewModel : ObservableObject
     public MainViewModel()
     {
         _engine.StateChanged += s => OnUi(() => State = s);
-        _engine.LogLine += AppendLog;
+        _engine.LogLine += line => OnUi(() => AppendLog(line));
 
         StartCommand = new RelayCommand(_ => Start(), _ => CanStart);
         StopCommand = new RelayCommand(_ => _engine.Stop(), _ => CanStop);

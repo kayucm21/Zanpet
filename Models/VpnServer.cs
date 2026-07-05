@@ -30,5 +30,6 @@ public sealed class VpnServer : ObservableObject
     public string Spx { get; set; } = "";
     public string Path { get; set; } = "";
     public string Mode { get; set; } = "";
+    public string ServiceName { get; set; } = "";
     public string RawUri { get; set; } = "";
 }
