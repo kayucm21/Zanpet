@@ -31,7 +31,7 @@ public sealed class UpdaterService
     private const string AppCdnFallback = "";
 
     /// <summary>Yandex Disk public share link for app updates (fallback when GitHub is slow).</summary>
-    private const string YandexDiskShareUrl = "https://disk.yandex.ru/d/ILFbZC4Pez241w";
+    private const string YandexDiskShareUrl = "https://disk.yandex.ru/d/qZ0IMBCDh1I6eA";
 
     private static HttpClient Http => HttpFactory.GitHub;
 
