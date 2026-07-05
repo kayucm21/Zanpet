@@ -457,13 +457,12 @@ public sealed class MainViewModel : ObservableObject
         // Apply saved theme
         ThemeManager.ApplyTheme(Settings.Theme);
 
-        // If launched after self-update, force re-copy engine from ClassicData
-        bool forceEngineUpdate = Environment.GetCommandLineArgs()
+        bool launchedAfterUpdate = Environment.GetCommandLineArgs()
             .Any(a => a.Equals("--launched-after-update", StringComparison.OrdinalIgnoreCase));
 
         // Copy engine binaries + data from ClassicData FIRST so the engine
         // check below finds winws2.exe without needing GitHub on a fresh install.
-        AutoImportClassicPresets(forceEngineUpdate);
+        AutoImportClassicPresets(launchedAfterUpdate);
 
         ReloadPresets();
         _hostlists.SeedDefaults();
@@ -475,10 +474,20 @@ public sealed class MainViewModel : ObservableObject
 
         EngineVersion = _updater.InstalledVersionDisplay ?? "не установлен";
 
-        if (!_updater.IsEngineInstalled || !_updater.IsEngineComplete)
+        // Skip app update check if just launched after update (prevent loop)
+        // but still check engine if not installed
+        if (launchedAfterUpdate)
+        {
+            AppendLog("Запуск после обновления — пропускаю проверку обновлений.");
+        }
+        else if (!_updater.IsEngineInstalled || !_updater.IsEngineComplete)
+        {
             await CheckAndUpdateAsync(silent: true);
+        }
         else
+        {
             await CheckAndUpdateAsync(silent: true);
+        }
 
         // Show changelog if version changed
         ShowChangelogIfUpdated();

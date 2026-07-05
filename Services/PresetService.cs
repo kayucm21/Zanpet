@@ -197,7 +197,7 @@ public sealed class PresetService
             "{IPSET:telegram}",
             "{IPSET_EXCLUDE:ru}",
             "--out-range=-d7",
-            "--lua-desync=multisplit:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20",
+            "--lua-desync=fake:blob=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=6",
         });
 
         return a;
@@ -237,7 +237,7 @@ public sealed class PresetService
             "{IPSET:telegram}",
             "{IPSET_EXCLUDE:ru}",
             "--out-range=-d7",
-            "--lua-desync=multisplit:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20",
+            "--lua-desync=fake:blob=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=6",
         };
     }
 
@@ -278,7 +278,7 @@ public sealed class PresetService
             "{IPSET:telegram}",
             "{IPSET_EXCLUDE:ru}",
             "--out-range=-d7",
-            "--lua-desync=multisplit:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20",
+            "--lua-desync=fake:blob=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=6",
         };
     }
 
@@ -315,7 +315,7 @@ public sealed class PresetService
             "{IPSET:telegram}",
             "{IPSET_EXCLUDE:ru}",
             "--out-range=-d7",
-            "--lua-desync=multisplit:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20",
+            "--lua-desync=fake:blob=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=6",
         };
     }
 
@@ -353,7 +353,7 @@ public sealed class PresetService
             "{IPSET:telegram}",
             "{IPSET_EXCLUDE:ru}",
             "--out-range=-d7",
-            "--lua-desync=multisplit:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20",
+            "--lua-desync=fake:blob=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=6",
         };
     }
 }
