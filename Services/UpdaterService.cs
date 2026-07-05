@@ -228,9 +228,9 @@ public sealed class UpdaterService
             string exeDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
             string batPath = Path.Combine(Path.GetTempPath(), "ZapretUI-update.bat");
             string selfExe = Environment.ProcessPath ?? Path.Combine(exeDir, "ZapretUI.exe");
+            string exeName = Path.GetFileName(selfExe);
             string logPath = Path.Combine(Path.GetTempPath(), "ZapretUI-update.log");
             string oldExe = Path.Combine(exeDir, "ZapretUI_old.exe");
-            string newExeName = Path.GetFileName(selfExe);
 
             var bat = new StringBuilder();
             bat.AppendLine("@echo off");
@@ -252,18 +252,28 @@ public sealed class UpdaterService
 
             bat.AppendLine(":copyphase");
             // Rename running exe (ren works on locked files on Windows)
-            bat.AppendLine($"if exist \"{selfExe}\" (");
-            bat.AppendLine($"  del /Q \"{oldExe}\" >nul 2>&1");
-            bat.AppendLine($"  ren \"{selfExe}\" \"ZapretUI_old.exe\" >nul 2>&1");
-            bat.AppendLine($"  echo Renamed old exe >> \"{logPath}\"");
-            bat.AppendLine($")");
-            // Copy new files
+            bat.AppendLine($"del /Q \"{oldExe}\" >nul 2>&1");
+            bat.AppendLine($"ren \"{selfExe}\" \"ZapretUI_old.exe\" >nul 2>&1");
+            bat.AppendLine($"echo Renamed old exe >> \"{logPath}\"");
+            // Copy new files from stageDir to exeDir
             bat.AppendLine($"echo Copying files...");
             bat.AppendLine($"robocopy \"{stageDir}\" \"{exeDir}\" /E /Y /R:3 /W:1 >> \"{logPath}\" 2>&1");
-            bat.AppendLine($"if %ERRORLEVEL% LSS 8 (echo COPY OK >> \"{logPath}\") else (echo COPY FAILED %ERRORLEVEL% >> \"{logPath}\")");
-            // Start new exe
-            bat.AppendLine($"echo Starting new exe...");
-            bat.AppendLine($"start \"\" \"{selfExe}\" --launched-after-update");
+            bat.AppendLine($"echo Robocopy exit: %ERRORLEVEL% >> \"{logPath}\"");
+            // Wait for filesystem to settle
+            bat.AppendLine($"timeout /t 2 /nobreak >nul");
+            // Verify the new exe exists before starting
+            bat.AppendLine($"if exist \"{selfExe}\" (");
+            bat.AppendLine($"  echo Starting new exe... >> \"{logPath}\"");
+            bat.AppendLine($"  start \"\" \"{selfExe}\" --launched-after-update");
+            bat.AppendLine($") else (");
+            bat.AppendLine($"  echo ERROR: exe not found after copy: {selfExe} >> \"{logPath}\"");
+            bat.AppendLine($"  echo Trying fallback path... >> \"{logPath}\"");
+            bat.AppendLine($"  if exist \"{exeDir}\\{exeName}\" (");
+            bat.AppendLine($"    start \"\" \"{exeDir}\\{exeName}\" --launched-after-update");
+            bat.AppendLine($"  ) else (");
+            bat.AppendLine($"    echo FATAL: cannot find exe anywhere >> \"{logPath}\"");
+            bat.AppendLine($"  )");
+            bat.AppendLine($")");
             // Cleanup: delete old exe and temp files
             bat.AppendLine($"timeout /t 3 /nobreak >nul");
             bat.AppendLine($"del /Q \"{oldExe}\" >nul 2>&1");
