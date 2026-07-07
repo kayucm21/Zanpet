@@ -532,23 +532,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Исправлено самобновление
-Bat-файл теперь ждёт завершения процесса (до 30 сек), затем ren + robocopy. Обновление работает надёжно.
+        return @"✦ Исправлены стратегии YouTube + Discord + Telegram
+Пресет снова использует отдельные правила для каждого сервиса (hostlist/ipset), как в рабочем Default v5. YouTube, Discord (войс/медиа) и Telegram (веб + MTProto) обходятся корректно.
 
-✦ Исправлен кросс-поточный вылет
-При запуске движка приложение больше не падает.
+✦ Telegram MTProto
+Для DC-адресов Telegram — send + syndata без seqovl (seqovl ломает MTProto).
 
-✦ Стратегии снова работают
-Все пресеты запускаются корректно.
-
-✦ VPN: добавлена поддержка grpc
-Новый сервер Irkutsk (grpc протокол).
-
-✦ Движок обновлён
-zapret2 v1.0.2 (движок 2.0.0).
-
-✦ Светлая тема
-Переключение в Настройки → Тема оформления.";
+✦ Автообновление
+Друзья могут обновиться через «Проверить обновления» в приложении — без повторной загрузки с нуля.";
     }
 
     private void AutoImportClassicPresets(bool force = false)
