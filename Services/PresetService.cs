@@ -170,10 +170,12 @@ public sealed class PresetService
         });
     }
 
-    /// <summary>Per-service profiles (YouTube / Discord / Telegram) scoped by hostlist or ipset.
-    /// Kept in allow-list mode; the optional catch-all at the end only runs with «Обход всех сайтов».</summary>
+    /// <summary>Per-service profiles (YouTube / Discord / Telegram) scoped by hostlist or ipset.</summary>
     private static void AppendServiceProfiles(List<string> a, IReadOnlyList<string> youtubeTlsDesync)
     {
+        AppendTelegramProfiles(a, firstSegment: true);
+
+        a.Add("--new");
         a.AddRange(new[]
         {
             "--filter-tcp=80,443",
@@ -259,27 +261,45 @@ public sealed class PresetService
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
         });
-        AppendTelegramProfiles(a);
     }
 
     /// <summary>Telegram web (TLS/SNI) + desktop MTProto (DC ipset). No seqovl — it breaks MTProto.</summary>
-    private static void AppendTelegramProfiles(List<string> a)
+    private static void AppendTelegramProfiles(List<string> a, bool firstSegment = false)
     {
-        // Web client + site (TLS with SNI) — Default v3 style, NOT multisplit/seqovl.
-        a.Add("--new");
+        void NextProfile()
+        {
+            if (!firstSegment) a.Add("--new");
+            firstSegment = false;
+        }
+
+        // Web: Default v3 — hostfakesplit_multi (no seqovl).
+        NextProfile();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,5222",
             "{HOSTLIST:telegram}",
-            "--hostlist-domains=web.telegram.org",
             "--payload=all",
             "--out-range=-n8",
             "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=tls_google",
             "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2",
         });
-        // Desktop/mobile MTProto to DC IPs (no SNI) — ipset + fake TLS, no seqovl.
-        a.Add("--new");
+
+        // Web: explicit WS/CDN domains.
+        NextProfile();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,5222",
+            "--hostlist-domains=web.telegram.org,pluto.web.telegram.org,zws1.web.telegram.org,zws2.web.telegram.org",
+            "--payload=all",
+            "--out-range=-n8",
+            "--lua-desync=send:repeats=3",
+            "--lua-desync=syndata:blob=tls_google",
+            "--lua-desync=multidisorder:pos=1,host+2,sld+2,sniext+1:ip_autottl=-2,3-20:ip6_autottl=-2,3-20",
+        });
+
+        // Desktop MTProto DC — Default v4 proven chain.
+        NextProfile();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,5222",
@@ -287,12 +307,13 @@ public sealed class PresetService
             "{IPSET:telegram-bypass}",
             "--payload=all",
             "--out-range=-n8",
-            "--lua-desync=send:repeats=3",
+            "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=tls_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20",
-            "--lua-desync=fake:blob=tls_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=6",
+            "--lua-desync=pass",
         });
-        // MTProto on 443 — fakedsplit at byte 1 (no SNI to split on).
-        a.Add("--new");
+
+        // Desktop MTProto alt — fake stun (no seqovl).
+        NextProfile();
         a.AddRange(new[]
         {
             "--filter-tcp=443",
@@ -300,7 +321,7 @@ public sealed class PresetService
             "{IPSET:telegram-bypass}",
             "--payload=all",
             "--out-range=-n8",
-            "--lua-desync=fakedsplit:pos=1:blob=tls_google:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
+            "--lua-desync=fake:blob=stun_pat:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=8",
         });
     }
 

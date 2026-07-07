@@ -21,6 +21,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly AutostartService _autostart = new();
     private readonly MonitorService _monitor = new();
     private readonly VpnService _vpn = new();
+    private readonly TgWsProxyService _tgWs = new();
 
     public event Action<string, string>? Notify;
 
@@ -28,8 +29,14 @@ public sealed class MainViewModel : ObservableObject
 
     public MainViewModel()
     {
-        _engine.StateChanged += s => OnUi(() => State = s);
+        _engine.StateChanged += s => OnUi(() =>
+        {
+            State = s;
+            if (s == EngineState.Stopped)
+                _tgWs.Stop();
+        });
         _engine.LogLine += line => OnUi(() => AppendLog(line));
+        _tgWs.LogLine += line => OnUi(() => AppendLog(line));
 
         StartCommand = new RelayCommand(_ => Start(), _ => CanStart);
         StopCommand = new RelayCommand(_ => _engine.Stop(), _ => CanStop);
@@ -532,14 +539,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Исправлен Telegram (веб + десктоп)
-Веб: hostfakesplit_multi без seqovl (seqovl ломает TLS). Десктоп MTProto: ipset DC + fake TLS + fakedsplit.
+        return @"✦ Telegram Desktop: встроен WS-прокси
+При обходе автоматически запускается tg-ws-proxy (127.0.0.1:1443). В Telegram укажите MTProto-прокси из лога.
 
-✦ Полный ipset Telegram
-Добавлены IPv6 и все официальные DC-подсети, плюс telegram-bypass.
+✦ Исправлен веб-Telegram
+Несколько профилей обхода: hostfakesplit + multidisorder, без seqovl.
 
-✦ ipcache-hostname
-Включён глобально — повторные пакеты web.telegram.org теперь попадают в обход.";
+✦ Расширены DC-адреса
+Полный ipset Telegram с IPv6 и приоритетными подсетями DC.";
     }
 
     private void AutoImportClassicPresets(bool force = false)
@@ -750,11 +757,30 @@ public sealed class MainViewModel : ObservableObject
         {
             _engine.Start(SelectedPreset, SelectedPreset.UsesHostlist ? null : null);
             RunningPreset = SelectedPreset;
+            if (Settings.TelegramWsProxy && PresetNeedsTelegramProxy(SelectedPreset))
+                _ = StartTelegramProxyAsync();
         }
         catch (Exception ex)
         {
             AppendLog($"Ошибка запуска: {ex.Message}");
             MessageBox.Show(ex.Message, "Не удалось запустить", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private static bool PresetNeedsTelegramProxy(Preset preset) =>
+        preset.Name.Contains("Telegram", StringComparison.OrdinalIgnoreCase);
+
+    private async Task StartTelegramProxyAsync()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(Settings.TelegramWsProxySecret))
+                _tgWs.Secret = Settings.TelegramWsProxySecret.Trim();
+            await _tgWs.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Telegram WS Proxy: {ex.Message}");
         }
     }
 

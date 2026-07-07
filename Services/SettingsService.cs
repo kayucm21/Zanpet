@@ -37,6 +37,12 @@ public sealed class AppSettings
     /// <summary>Theme mode: "dark" (default) or "light".</summary>
     public string Theme { get; set; } = "dark";
 
+    /// <summary>Auto-start Flowseal tg-ws-proxy for Telegram Desktop (MTProto→WebSocket).</summary>
+    public bool TelegramWsProxy { get; set; } = true;
+
+    /// <summary>Fixed MTProto secret for tg-ws-proxy (32 hex chars).</summary>
+    public string TelegramWsProxySecret { get; set; } = "eecb9b9a39b6f0d6e8c4a2b1f0d3e7a";
+
     /// <summary>Last app version the user saw the changelog for. Empty = never shown.</summary>
     public string LastSeenVersion { get; set; } = "";
 

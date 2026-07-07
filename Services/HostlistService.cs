@@ -135,7 +135,10 @@ public sealed class HostlistService
     /// telegra.ph, HTTPS CDN). The desktop/mobile app's media goes over MTProto to DC IPs (no SNI).</summary>
     private static readonly string[] DefaultTelegram =
     {
-        "telegram.org", "web.telegram.org", "t.me", "telegram.me", "tx.me", "teleg.xyz",
+        "telegram.org", "web.telegram.org", "pluto.web.telegram.org",
+        "zws1.web.telegram.org", "zws2.web.telegram.org", "zws3.web.telegram.org",
+        "zws4.web.telegram.org", "zws5.web.telegram.org", "k.telegram.org",
+        "t.me", "telegram.me", "tx.me", "teleg.xyz",
         "telegra.ph", "graph.org", "telesco.pe", "comments.app",
         "fragment.com", "contest.com", "quiz.directory",
         "tg.dev", "tg.org", "tgram.org", "torg.org", "telegramapp.org",
@@ -155,6 +158,11 @@ public sealed class HostlistService
         "91.108.56.0/22",
         "91.105.192.0/23",
         "149.154.160.0/20",
+        "149.154.175.0/24",
+        "149.154.174.0/24",
+        "149.154.167.51/32",
+        "149.154.175.50/32",
+        "91.108.56.130/32",
         "185.76.151.0/24",
         "2001:b28:f23d::/48",
         "2001:b28:f23f::/48",

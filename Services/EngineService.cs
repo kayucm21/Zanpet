@@ -79,12 +79,15 @@ public sealed class EngineService : IDisposable
         // packets (web.telegram.org, Telegram DC reconnects) often fails.
         args.Add("--ipcache-lifetime=8400");
         args.Add("--ipcache-hostname=1");
+        args.Add("--ctrack-disable=0");
 
         // {WF_TCP}/{WF_UDP}: WinDivert capture width.
         // OFF (default) → narrow (80,443 + Discord voice ranges) so game traffic is left untouched.
         // Discord voice spans the WHOLE 50000-65535 UDP range — capturing only 50000-50100 misses
         // half the voice servers, which shows up as a permanent 5000 ping.
-        string wfTcp = gameFilter ? "--wf-tcp-out=80,443-65535" : "--wf-tcp-out=80,443,5222";
+        string wfTcp = gameFilter
+            ? "--wf-tcp-out=80,443-65535"
+            : "--wf-tcp-out=80,443,5222,1080,2053,2083,2087,2096,8443";
         string wfUdp = gameFilter ? "--wf-udp-out=443-65535" : "--wf-udp-out=443,19294-19344,50000-65535";
 
         string hostlistArg = !string.IsNullOrWhiteSpace(hostlistPath)
@@ -166,6 +169,7 @@ public sealed class EngineService : IDisposable
             if (profile.Count == 0) return;
             int ex = profile.FindIndex(a => a.StartsWith("--hostlist-exclude=", StringComparison.Ordinal));
             bool scoped = profile.Any(a => a.StartsWith("--hostlist=", StringComparison.Ordinal)
+                                        || a.StartsWith("--hostlist-domains=", StringComparison.Ordinal)
                                         || a.StartsWith("--ipset=", StringComparison.Ordinal));
             // Bare global = a broad protocol desync with no list pinning it (and not the first segment,
             // which carries the global setup args + first real profile).
