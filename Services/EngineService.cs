@@ -75,7 +75,12 @@ public sealed class EngineService : IDisposable
                 args.Add("--lua-init=@" + Fwd(lua));
         }
 
-        // {WF_TCP}/{WF_UDP}: WinDivert capture width. Game filter ON → all high ports (games + media);
+        // Classic presets always carry these; without them hostlist/ipset matching on later
+        // packets (web.telegram.org, Telegram DC reconnects) often fails.
+        args.Add("--ipcache-lifetime=8400");
+        args.Add("--ipcache-hostname=1");
+
+        // {WF_TCP}/{WF_UDP}: WinDivert capture width.
         // OFF (default) → narrow (80,443 + Discord voice ranges) so game traffic is left untouched.
         // Discord voice spans the WHOLE 50000-65535 UDP range — capturing only 50000-50100 misses
         // half the voice servers, which shows up as a permanent 5000 ping.

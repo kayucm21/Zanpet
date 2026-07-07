@@ -532,14 +532,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Исправлены стратегии YouTube + Discord + Telegram
-Пресет снова использует отдельные правила для каждого сервиса (hostlist/ipset), как в рабочем Default v5. YouTube, Discord (войс/медиа) и Telegram (веб + MTProto) обходятся корректно.
+        return @"✦ Исправлен Telegram (веб + десктоп)
+Веб: hostfakesplit_multi без seqovl (seqovl ломает TLS). Десктоп MTProto: ipset DC + fake TLS + fakedsplit.
 
-✦ Telegram MTProto
-Для DC-адресов Telegram — send + syndata без seqovl (seqovl ломает MTProto).
+✦ Полный ipset Telegram
+Добавлены IPv6 и все официальные DC-подсети, плюс telegram-bypass.
 
-✦ Автообновление
-Друзья могут обновиться через «Проверить обновления» в приложении — без повторной загрузки с нуля.";
+✦ ipcache-hostname
+Включён глобально — повторные пакеты web.telegram.org теперь попадают в обход.";
     }
 
     private void AutoImportClassicPresets(bool force = false)

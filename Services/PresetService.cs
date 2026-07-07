@@ -259,25 +259,48 @@ public sealed class PresetService
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
         });
+        AppendTelegramProfiles(a);
+    }
+
+    /// <summary>Telegram web (TLS/SNI) + desktop MTProto (DC ipset). No seqovl — it breaks MTProto.</summary>
+    private static void AppendTelegramProfiles(List<string> a)
+    {
+        // Web client + site (TLS with SNI) — Default v3 style, NOT multisplit/seqovl.
         a.Add("--new");
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,5222",
             "{HOSTLIST:telegram}",
+            "--hostlist-domains=web.telegram.org",
             "--payload=all",
             "--out-range=-n8",
             "--lua-desync=send:repeats=2",
-            "--lua-desync=multisplit:seqovl=211:seqovl_pattern=tls5",
+            "--lua-desync=syndata:blob=tls_google",
+            "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2",
         });
+        // Desktop/mobile MTProto to DC IPs (no SNI) — ipset + fake TLS, no seqovl.
         a.Add("--new");
         a.AddRange(new[]
         {
-            "--filter-tcp=80,443",
+            "--filter-tcp=80,443,5222",
             "{IPSET:telegram}",
+            "{IPSET:telegram-bypass}",
+            "--payload=all",
             "--out-range=-n8",
-            "--lua-desync=send:repeats=2",
-            "--lua-desync=syndata:blob=tls_google:ip_autottl=-2,3-20",
-            "--lua-desync=pass",
+            "--lua-desync=send:repeats=3",
+            "--lua-desync=syndata:blob=tls_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20",
+            "--lua-desync=fake:blob=tls_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=6",
+        });
+        // MTProto on 443 — fakedsplit at byte 1 (no SNI to split on).
+        a.Add("--new");
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "{IPSET:telegram}",
+            "{IPSET:telegram-bypass}",
+            "--payload=all",
+            "--out-range=-n8",
+            "--lua-desync=fakedsplit:pos=1:blob=tls_google:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
         });
     }
 
