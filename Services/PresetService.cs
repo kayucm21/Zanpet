@@ -166,7 +166,6 @@ public sealed class PresetService
             "--wf-raw-part=@{WF}/windivert_part.wireguard.txt",
             "--filter-tcp=80,443-65535",
             "{IPSET_EXCLUDE:ru}",
-            "{IPSET_EXCLUDE:telegram}",
             "--out-range=-d7",
             "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=stun_pat:repeats=2",
@@ -192,14 +191,6 @@ public sealed class PresetService
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
         });
-        a.Add("--new");
-        a.AddRange(new[] {
-            "--filter-tcp=443",
-            "{IPSET:telegram}",
-            "{IPSET_EXCLUDE:ru}",
-            "--out-range=-d7",
-            "--lua-desync=fakedsplit:pos=sniext:blob=tls_google:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
-        });
 
         return a;
     }
@@ -218,7 +209,6 @@ public sealed class PresetService
             "--wf-raw-part=@{WF}/windivert_part.wireguard.txt",
             "--filter-tcp=80,443-65535",
             "{IPSET_EXCLUDE:ru}",
-            "{IPSET_EXCLUDE:telegram}",
             "--out-range=-d7",
             "--lua-desync=send:repeats=3",
             "--lua-desync=syndata:blob=stun_pat:repeats=3",
@@ -234,12 +224,6 @@ public sealed class PresetService
             "--filter-udp=19294-19344,50000-65535",
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=3",
-            "--new",
-            "--filter-tcp=443",
-            "{IPSET:telegram}",
-            "{IPSET_EXCLUDE:ru}",
-            "--out-range=-d7",
-            "--lua-desync=fakedsplit:pos=sniext:blob=tls_google:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
         };
     }
 
@@ -257,7 +241,6 @@ public sealed class PresetService
             "--wf-raw-part=@{WF}/windivert_part.wireguard.txt",
             "--filter-tcp=80,443-65535",
             "{IPSET_EXCLUDE:ru}",
-            "{IPSET_EXCLUDE:telegram}",
             "--out-range=-d7",
             "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=stun_pat:repeats=2",
@@ -265,7 +248,6 @@ public sealed class PresetService
             "--new",
             "--filter-tcp=80,443-65535",
             "{IPSET_EXCLUDE:ru}",
-            "{IPSET_EXCLUDE:telegram}",
             "--lua-desync=fakeddisorder:blob=tls_google:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
             "--new",
             "--filter-udp=80,443-65535",
@@ -277,12 +259,6 @@ public sealed class PresetService
             "--filter-udp=19294-19344,50000-65535",
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
-            "--new",
-            "--filter-tcp=443",
-            "{IPSET:telegram}",
-            "{IPSET_EXCLUDE:ru}",
-            "--out-range=-d7",
-            "--lua-desync=fakedsplit:pos=sniext:blob=tls_google:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
         };
     }
 
@@ -300,7 +276,6 @@ public sealed class PresetService
             "--wf-raw-part=@{WF}/windivert_part.wireguard.txt",
             "--filter-tcp=80,443-65535",
             "{IPSET_EXCLUDE:ru}",
-            "{IPSET_EXCLUDE:telegram}",
             "--out-range=-d7",
             "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=stun_pat:repeats=2",
@@ -315,12 +290,6 @@ public sealed class PresetService
             "--filter-udp=19294-19344,50000-65535",
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
-            "--new",
-            "--filter-tcp=443",
-            "{IPSET:telegram}",
-            "{IPSET_EXCLUDE:ru}",
-            "--out-range=-d7",
-            "--lua-desync=fakedsplit:pos=sniext:blob=tls_google:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
         };
     }
 
@@ -338,7 +307,6 @@ public sealed class PresetService
             "--wf-raw-part=@{WF}/windivert_part.wireguard.txt",
             "--filter-tcp=80,443-65535",
             "{IPSET_EXCLUDE:ru}",
-            "{IPSET_EXCLUDE:telegram}",
             "--out-range=-d7",
             "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=stun_pat:repeats=2",
@@ -354,12 +322,6 @@ public sealed class PresetService
             "--filter-udp=19294-19344,50000-65535",
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
-            "--new",
-            "--filter-tcp=443",
-            "{IPSET:telegram}",
-            "{IPSET_EXCLUDE:ru}",
-            "--out-range=-d7",
-            "--lua-desync=fakedsplit:pos=sniext:blob=tls_google:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
         };
     }
 }
