@@ -177,6 +177,9 @@ public sealed class PresetService
         AppendTelegramProfiles(a, firstSegment: true);
 
         a.Add("--new");
+        AppendDiscordProfiles(a);
+
+        a.Add("--new");
         a.AddRange(new[]
         {
             "--filter-tcp=80,443",
@@ -201,8 +204,6 @@ public sealed class PresetService
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=8:payload=all",
         });
-        a.Add("--new");
-        AppendDiscordProfiles(a);
     }
 
     /// <summary>Discord site + voice/media (Default v3 style hostfakesplit + STUN/UDP voice).</summary>
@@ -215,10 +216,22 @@ public sealed class PresetService
             "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2",
         ];
 
+        // Web + desktop login (discord.com) — first.
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
+            "--hostlist-domains=discord.com,www.discord.com,discordapp.com,status.discord.com,challenges.cloudflare.com",
+            "--payload=all",
+            "--out-range=-d10",
+        });
+        a.AddRange(discordTls);
+
+        a.Add("--new");
         a.AddRange(new[]
         {
             "--filter-tcp=443",
             "--hostlist-domains=updates.discord.com,gateway.discord.gg",
+            "--payload=all",
             "--out-range=-d10",
         });
         a.AddRange(discordTls);
@@ -228,6 +241,7 @@ public sealed class PresetService
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
             "{HOSTLIST:discord}",
+            "--payload=all",
             "--out-range=-d10",
         });
         a.AddRange(discordTls);
@@ -236,16 +250,32 @@ public sealed class PresetService
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
-            "--hostlist-domains=discord.media,cdn.discordapp.com,media.discordapp.net",
+            "--hostlist-domains=discord.media,cdn.discordapp.com,media.discordapp.net,latency.discord.media",
+            "--payload=all",
             "--out-range=-d10",
         });
         a.AddRange(discordTls);
+
+        // Web fallback — small multidisorder for discord.com TLS.
+        a.Add("--new");
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "--hostlist-domains=discord.com,www.discord.com,discordapp.com",
+            "--payload=all",
+            "--out-range=-d10",
+            "--lua-desync=send:repeats=2",
+            "--lua-desync=syndata:blob=tls_google",
+            "--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1",
+        });
 
         a.Add("--new");
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
             "{IPSET:discord}",
+            "{EXCLUDE:discord}",
+            "--payload=all",
             "--out-range=-d10",
         });
         a.AddRange(discordTls);

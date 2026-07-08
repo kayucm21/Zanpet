@@ -23,6 +23,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly VpnService _vpn = new();
     private readonly TgWsProxyService _tgWs = new();
     private readonly TelegramHostsService _telegramHosts = new();
+    private readonly DiscordHostsService _discordHosts = new();
 
     public event Action<string, string>? Notify;
 
@@ -37,11 +38,13 @@ public sealed class MainViewModel : ObservableObject
             {
                 _tgWs.Stop();
                 _telegramHosts.Remove();
+                _discordHosts.Remove();
             }
         });
         _engine.LogLine += line => OnUi(() => AppendLog(line));
         _tgWs.LogLine += line => OnUi(() => AppendLog(line));
         _telegramHosts.LogLine += line => OnUi(() => AppendLog(line));
+        _discordHosts.LogLine += line => OnUi(() => AppendLog(line));
 
         StartCommand = new RelayCommand(_ => Start(), _ => CanStart);
         StopCommand = new RelayCommand(_ => _engine.Stop(), _ => CanStop);
@@ -544,14 +547,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Discord: голос и видеозвонки
-hostfakesplit для discord.media/gateway, STUN + UDP 19294/50000-65535 с ipset, двусторонний WinDivert.
+        return @"✦ Discord: веб + ПК-приложение
+hosts для discord.com → Cloudflare, hostfakesplit + multidisorder, ipset не перехватывает TLS.
 
-✦ Telegram Web + Desktop
-hosts для web.telegram.org, tg-ws-proxy для ПК-приложения.
+✦ Discord: голос
+STUN + UDP 19294/50000-65535 с ipset-discord.
 
-✦ Стабильность
-Исправлен вылет движка (неверный payload filter).";
+✦ Telegram
+hosts для web.telegram.org, tg-ws-proxy для десктопа.";
     }
 
     private void AutoImportClassicPresets(bool force = false)
@@ -760,12 +763,14 @@ hosts для web.telegram.org, tg-ws-proxy для ПК-приложения.
         }
         try
         {
-            if (Settings.TelegramWebHosts && PresetNeedsTelegramProxy(SelectedPreset))
+            if (Settings.TelegramWebHosts && PresetHasService(SelectedPreset, "Telegram"))
                 _telegramHosts.Apply();
+            if (Settings.DiscordWebHosts && PresetHasService(SelectedPreset, "Discord"))
+                _discordHosts.Apply();
 
             _engine.Start(SelectedPreset, SelectedPreset.UsesHostlist ? null : null);
             RunningPreset = SelectedPreset;
-            if (_engine.IsRunning && Settings.TelegramWsProxy && PresetNeedsTelegramProxy(SelectedPreset))
+            if (_engine.IsRunning && Settings.TelegramWsProxy && PresetHasService(SelectedPreset, "Telegram"))
                 _ = StartTelegramProxyAsync();
         }
         catch (Exception ex)
@@ -775,8 +780,11 @@ hosts для web.telegram.org, tg-ws-proxy для ПК-приложения.
         }
     }
 
+    private static bool PresetHasService(Preset preset, string service) =>
+        preset.Name.Contains(service, StringComparison.OrdinalIgnoreCase);
+
     private static bool PresetNeedsTelegramProxy(Preset preset) =>
-        preset.Name.Contains("Telegram", StringComparison.OrdinalIgnoreCase);
+        PresetHasService(preset, "Telegram");
 
     private async Task StartTelegramProxyAsync()
     {
@@ -882,6 +890,7 @@ hosts для web.telegram.org, tg-ws-proxy для ПК-приложения.
 
     public void Shutdown()
     {
+        try { _discordHosts.Remove(); } catch { }
         try { _telegramHosts.Remove(); } catch { }
         try { _monitor.Dispose(); } catch { }
         try { _vpn.Dispose(); } catch { }
