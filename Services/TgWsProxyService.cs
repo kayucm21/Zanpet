@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
+using System.Net.Sockets;
+using System.Text.Json;
 
 namespace ZapretUI.Services;
 
@@ -17,6 +19,9 @@ public sealed class TgWsProxyService : IDisposable
     private const string DownloadUrl =
         "https://github.com/Flowseal/tg-ws-proxy/releases/download/v1.8.1/TgWsProxy_windows.exe";
 
+    private const string DownloadMirrorUrl =
+        "https://sourceforge.net/projects/tg-ws-proxy.mirror/files/v1.8.1/TgWsProxy_windows.exe/download";
+
     private static readonly HttpClient Http = HttpFactory.General;
 
     private Process? _proc;
@@ -27,24 +32,44 @@ public sealed class TgWsProxyService : IDisposable
 
     public event Action<string>? LogLine;
 
-    private static string ExePath => Path.Combine(AppPaths.EngineDir, "tgws", "TgWsProxy.exe");
+    private static string ExeDir => Path.Combine(AppPaths.EngineDir, "tgws");
+    private static string ExePath => Path.Combine(ExeDir, "TgWsProxy.exe");
+    private static string PortableDataDir => Path.Combine(ExeDir, "TgWsProxy_data");
+    private static string ConfigPath => Path.Combine(PortableDataDir, "config.json");
+
+    /// <summary>tg:// deeplink to auto-enable the proxy in Telegram Desktop (dd + secret).</summary>
+    public string ProxyDeeplink =>
+        $"tg://proxy?server={DefaultHost}&port={DefaultPort}&secret=dd{Secret}";
 
     public async Task EnsureInstalledAsync(CancellationToken ct = default)
     {
         if (File.Exists(ExePath)) return;
 
-        Directory.CreateDirectory(Path.GetDirectoryName(ExePath)!);
+        Directory.CreateDirectory(ExeDir);
         Emit("Загрузка Telegram WS Proxy…");
 
-        using var resp = await Http.GetAsync(DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct)
-            .ConfigureAwait(false);
-        resp.EnsureSuccessStatusCode();
+        Exception? last = null;
+        foreach (var url in new[] { DownloadUrl, DownloadMirrorUrl })
+        {
+            try
+            {
+                using var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct)
+                    .ConfigureAwait(false);
+                resp.EnsureSuccessStatusCode();
+                await using var src = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                await using var dst = new FileStream(ExePath, FileMode.Create, FileAccess.Write, FileShare.None);
+                await src.CopyToAsync(dst, ct).ConfigureAwait(false);
+                Emit("Telegram WS Proxy установлен.");
+                return;
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+            }
+        }
 
-        await using var src = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-        await using var dst = new FileStream(ExePath, FileMode.Create, FileAccess.Write, FileShare.None);
-        await src.CopyToAsync(dst, ct).ConfigureAwait(false);
-
-        Emit("Telegram WS Proxy установлен.");
+        throw new InvalidOperationException(
+            $"Не удалось скачать TgWsProxy: {last?.Message ?? "неизвестная ошибка"}");
     }
 
     public async Task StartAsync(CancellationToken ct = default)
@@ -52,41 +77,92 @@ public sealed class TgWsProxyService : IDisposable
         if (IsRunning) return;
 
         await EnsureInstalledAsync(ct).ConfigureAwait(false);
+        WritePortableConfig();
 
         var psi = new ProcessStartInfo
         {
             FileName = ExePath,
-            Arguments = $"--port {DefaultPort} --host {DefaultHost} --secret {Secret}",
+            Arguments = "--portable",
+            WorkingDirectory = ExeDir,
             UseShellExecute = false,
             CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden,
         };
 
-        try
+        _proc = Process.Start(psi)
+            ?? throw new InvalidOperationException("Не удалось запустить TgWsProxy.");
+
+        if (!await WaitForListenAsync(DefaultHost, DefaultPort, TimeSpan.FromSeconds(12), ct).ConfigureAwait(false))
         {
-            _proc = Process.Start(psi);
-            if (_proc is null) throw new InvalidOperationException("Не удалось запустить TgWsProxy.");
-            await Task.Delay(800, ct).ConfigureAwait(false);
-            if (_proc.HasExited)
-                throw new InvalidOperationException($"TgWsProxy завершился (код {_proc.ExitCode}).");
-            Emit($"Telegram Desktop: MTProto прокси {DefaultHost}:{DefaultPort} secret={Secret}");
-            Emit("В Telegram: Настройки → Данные и память → Прокси → MTProto → укажите адрес выше.");
+            int code = _proc.HasExited ? _proc.ExitCode : -1;
+            throw new InvalidOperationException(
+                code >= 0
+                    ? $"TgWsProxy завершился (код {code}). Порт {DefaultPort} занят?"
+                    : $"TgWsProxy не слушает {DefaultHost}:{DefaultPort} — проверьте, не запущен ли другой экземпляр.");
         }
-        catch
+
+        Emit($"Telegram Desktop: MTProto прокси {DefaultHost}:{DefaultPort}");
+        Emit($"Secret (ручной ввод): dd{Secret}");
+        Emit("Открываю настройку прокси в Telegram…");
+        TryOpenTelegramProxy();
+    }
+
+    private void WritePortableConfig()
+    {
+        Directory.CreateDirectory(PortableDataDir);
+        var cfg = new Dictionary<string, object?>
         {
-            // Tray build may ignore CLI args — try bare launch (defaults to 127.0.0.1:1443).
+            ["port"] = DefaultPort,
+            ["host"] = DefaultHost,
+            ["secret"] = Secret,
+            ["dc_ip"] = new[] { "2:149.154.167.220", "4:149.154.167.220" },
+            ["verbose"] = false,
+            ["check_updates"] = false,
+            ["log_max_mb"] = 5,
+            ["buf_kb"] = 256,
+            ["pool_size"] = 4,
+            ["cfproxy"] = true,
+            ["cfproxy_user_domain"] = Array.Empty<string>(),
+            ["cfproxy_worker_domain"] = Array.Empty<string>(),
+            ["force_test_dc"] = false,
+            ["ws_keepalive_interval"] = 30,
+            ["language"] = "ru",
+        };
+        File.WriteAllText(ConfigPath, JsonSerializer.Serialize(cfg, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    private static async Task<bool> WaitForListenAsync(
+        string host, int port, TimeSpan timeout, CancellationToken ct)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            ct.ThrowIfCancellationRequested();
             try
             {
-                psi.Arguments = "";
-                _proc = Process.Start(psi);
-                if (_proc is not null && !_proc.HasExited)
-                {
-                    Emit($"Telegram Desktop: MTProto прокси {DefaultHost}:{DefaultPort} (секрет — в окне TgWsProxy в трее).");
-                    return;
-                }
+                using var tcp = new TcpClient();
+                await tcp.ConnectAsync(host, port, ct).ConfigureAwait(false);
+                return true;
             }
-            catch { /* fall through */ }
-            throw;
+            catch
+            {
+                await Task.Delay(400, ct).ConfigureAwait(false);
+            }
+        }
+        return false;
+    }
+
+    private void TryOpenTelegramProxy()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(ProxyDeeplink) { UseShellExecute = true });
+            Emit("Если Telegram не открылся — вставьте ссылку из лога в браузер или настройте прокси вручную.");
+        }
+        catch (Exception ex)
+        {
+            Emit($"Не удалось открыть tg:// ссылку: {ex.Message}");
+            Emit($"Скопируйте в браузер: {ProxyDeeplink}");
         }
     }
 

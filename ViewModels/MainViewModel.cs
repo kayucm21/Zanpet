@@ -539,14 +539,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Telegram Desktop: встроен WS-прокси
-При обходе автоматически запускается tg-ws-proxy (127.0.0.1:1443). В Telegram укажите MTProto-прокси из лога.
+        return @"✦ Telegram Desktop: автонастройка прокси
+tg-ws-proxy пишет config.json и открывает tg:// ссылку — прокси 127.0.0.1:1443 включается в Telegram автоматически.
 
 ✦ Исправлен веб-Telegram
-Несколько профилей обхода: hostfakesplit + multidisorder, без seqovl.
+Убран multidisorder (ломал TLS). Только hostfakesplit_multi для web.telegram.org и zws1-5.
 
-✦ Расширены DC-адреса
-Полный ipset Telegram с IPv6 и приоритетными подсетями DC.";
+✦ Надёжная загрузка TgWsProxy
+Зеркало SourceForge, если GitHub недоступен.";
     }
 
     private void AutoImportClassicPresets(bool force = false)

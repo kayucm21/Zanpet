@@ -285,17 +285,17 @@ public sealed class PresetService
             "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2",
         });
 
-        // Web: explicit WS/CDN domains.
+        // Web: explicit WS/CDN domains (hostfakesplit only — multidisorder breaks web.telegram.org).
         NextProfile();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,5222",
-            "--hostlist-domains=web.telegram.org,pluto.web.telegram.org,zws1.web.telegram.org,zws2.web.telegram.org",
+            "--hostlist-domains=web.telegram.org,pluto.web.telegram.org,zws1.web.telegram.org,zws2.web.telegram.org,zws3.web.telegram.org,zws4.web.telegram.org,zws5.web.telegram.org,k.telegram.org",
             "--payload=all",
             "--out-range=-n8",
             "--lua-desync=send:repeats=3",
             "--lua-desync=syndata:blob=tls_google",
-            "--lua-desync=multidisorder:pos=1,host+2,sld+2,sniext+1:ip_autottl=-2,3-20:ip6_autottl=-2,3-20",
+            "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=3",
         });
 
         // Desktop MTProto DC — Default v4 proven chain.
