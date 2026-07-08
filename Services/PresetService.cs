@@ -304,7 +304,7 @@ public sealed class PresetService
         {
             "--filter-tcp=80,443,5222",
             "--hostlist-domains=web.telegram.org,api.telegram.org,pluto.web.telegram.org",
-            "--payload=tls,http",
+            "--payload=all",
             "--out-range=-n8",
             "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=tls_google",

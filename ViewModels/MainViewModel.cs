@@ -544,14 +544,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Telegram Web: hosts-файл
-При обходе прописываются домены web.telegram.org → рабочий DC (как в Flowseal). DNS сбрасывается автоматически.
+        return @"✦ Исправлен вылет всех стратегий
+Убран неверный payload=tls,http — движок больше не падает с «Invalid payload filter».
 
-✦ Разделены веб и MTProto
-TLS-профили для web.telegram.org; ipset-профили не трогают веб-SNI.
+✦ Telegram Web: hosts-файл
+Домены web.telegram.org → рабочий DC, DNS сбрасывается автоматически.
 
 ✦ Telegram Desktop
-tg-ws-proxy с автонастройкой через tg:// ссылку.";
+tg-ws-proxy запускается только если движок успешно стартовал.";
     }
 
     private void AutoImportClassicPresets(bool force = false)
@@ -765,7 +765,7 @@ tg-ws-proxy с автонастройкой через tg:// ссылку.";
 
             _engine.Start(SelectedPreset, SelectedPreset.UsesHostlist ? null : null);
             RunningPreset = SelectedPreset;
-            if (Settings.TelegramWsProxy && PresetNeedsTelegramProxy(SelectedPreset))
+            if (_engine.IsRunning && Settings.TelegramWsProxy && PresetNeedsTelegramProxy(SelectedPreset))
                 _ = StartTelegramProxyAsync();
         }
         catch (Exception ex)

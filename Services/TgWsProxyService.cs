@@ -94,7 +94,7 @@ public sealed class TgWsProxyService : IDisposable
 
         if (!await WaitForListenAsync(DefaultHost, DefaultPort, TimeSpan.FromSeconds(12), ct).ConfigureAwait(false))
         {
-            int code = _proc.HasExited ? _proc.ExitCode : -1;
+            int code = _proc is { HasExited: true } p ? p.ExitCode : -1;
             throw new InvalidOperationException(
                 code >= 0
                     ? $"TgWsProxy завершился (код {code}). Порт {DefaultPort} занят?"
