@@ -92,6 +92,14 @@ public sealed class HostlistService
         Write("general",  string.Join('\n', DefaultGeneral));
         WriteIpset("telegram", string.Join('\n', DefaultTelegramIpset));
         WriteIpset("telegram-bypass", string.Join('\n', DefaultTelegramBypassIpset));
+        SeedDiscordIpset();
+    }
+
+    private void SeedDiscordIpset()
+    {
+        string bundled = Path.Combine(AppPaths.ClassicDataDir, "lists", "ipset-discord.txt");
+        if (File.Exists(bundled))
+            WriteIpset("discord", File.ReadAllText(bundled));
     }
 
     private void WriteIpset(string name, string content)
@@ -117,10 +125,12 @@ public sealed class HostlistService
     /// zapret matches subdomains, so the base domains are enough.</summary>
     private static readonly string[] DefaultDiscord =
     {
-        "dis.gd", "discord.com", "discord.gg", "discord.media", "discord.app", "discord.co",
+        "dis.gd", "discord.com", "discord.gg", "gateway.discord.gg", "discord.media",
+        "discord.app", "discord.co",
         "discord.dev", "discord.design", "discord.gift", "discord.gifts",
         "discord.new", "discord.store", "discord.status",
-        "discordapp.com", "discordapp.net", "discordcdn.com", "discordstatus.com",
+        "discordapp.com", "discordapp.net", "cdn.discordapp.com", "media.discordapp.net",
+        "discordcdn.com", "discordstatus.com",
         "discordmerch.com", "discord-activities.com", "discordactivities.com",
         "discordsays.com", "discordsez.com", "discordpartygames.com",
         "discord-attachments-uploads-prd.storage.googleapis.com",

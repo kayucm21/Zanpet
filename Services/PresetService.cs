@@ -165,6 +165,7 @@ public sealed class PresetService
             "--blob=quic2:@{FILES}/fake/quic_2.bin",
             "--blob=fake_default_udp:0x00000000000000000000000000000000",
             "--wf-raw-part=@{WF}/windivert_part.discord_media.txt",
+            "--wf-raw-part=@{WF}/windivert_part.discord_bidirectional.txt",
             "--wf-raw-part=@{WF}/windivert_part.stun.txt",
             "--wf-raw-part=@{WF}/windivert_part.wireguard.txt",
         });
@@ -201,49 +202,65 @@ public sealed class PresetService
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=8:payload=all",
         });
         a.Add("--new");
+        AppendDiscordProfiles(a);
+    }
+
+    /// <summary>Discord site + voice/media (Default v3 style hostfakesplit + STUN/UDP voice).</summary>
+    private static void AppendDiscordProfiles(List<string> a)
+    {
+        string[] discordTls =
+        [
+            "--lua-desync=send:repeats=3",
+            "--lua-desync=syndata:blob=tls_google",
+            "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2",
+        ];
+
         a.AddRange(new[]
         {
             "--filter-tcp=443",
-            "--hostlist-domains=updates.discord.com",
+            "--hostlist-domains=updates.discord.com,gateway.discord.gg",
             "--out-range=-d10",
-            "--lua-desync=send:repeats=3",
-            "--lua-desync=syndata:blob=tls_google",
         });
+        a.AddRange(discordTls);
+
         a.Add("--new");
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
             "{HOSTLIST:discord}",
             "--out-range=-d10",
-            "--lua-desync=send:repeats=3",
-            "--lua-desync=syndata:blob=tls_google",
         });
+        a.AddRange(discordTls);
+
         a.Add("--new");
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
-            "--hostlist-domains=discord.media",
+            "--hostlist-domains=discord.media,cdn.discordapp.com,media.discordapp.net",
             "--out-range=-d10",
-            "--lua-desync=send:repeats=3",
-            "--lua-desync=syndata:blob=tls_google",
         });
+        a.AddRange(discordTls);
+
         a.Add("--new");
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
             "{IPSET:discord}",
             "--out-range=-d10",
-            "--lua-desync=send:repeats=3",
-            "--lua-desync=syndata:blob=tls_google",
         });
+        a.AddRange(discordTls);
+
+        // Voice/STUN discovery (Discord RTC).
         a.Add("--new");
         a.AddRange(new[]
         {
             "--filter-l7=stun,discord",
             "--payload=stun,discord_ip_discovery",
             "--out-range=-n8",
+            "--lua-desync=fake:blob=stun_pat:repeats=4",
             "--lua-desync=fake:blob=fake_default_udp",
         });
+
         a.Add("--new");
         a.AddRange(new[]
         {
@@ -254,12 +271,29 @@ public sealed class PresetService
             "--lua-desync=fake:blob=quic2:repeats=7",
             "--lua-desync=udplen:increment=5:pattern=0xDEADBEEF",
         });
+
+        // Voice/media UDP (19294 + 50000-65535) — ipset-scoped like Default v5.
         a.Add("--new");
         a.AddRange(new[]
         {
             "--filter-udp=19294-19344,50000-65535",
+            "{IPSET:discord}",
+            "--out-range=-n8",
             "--payload=all",
-            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
+            "--lua-desync=fake:blob=stun_pat:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=4",
+            "--lua-desync=fake:blob=quic2:repeats=7",
+            "--lua-desync=udplen:increment=5:pattern=0xDEADBEEF",
+        });
+
+        a.Add("--new");
+        a.AddRange(new[]
+        {
+            "--filter-udp=444-65535",
+            "{IPSET:discord}",
+            "--out-range=-n8",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic2:repeats=7",
+            "--lua-desync=udplen:increment=5:pattern=0xDEADBEEF",
         });
     }
 

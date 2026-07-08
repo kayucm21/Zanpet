@@ -544,14 +544,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Исправлен вылет всех стратегий
-Убран неверный payload=tls,http — движок больше не падает с «Invalid payload filter».
+        return @"✦ Discord: голос и видеозвонки
+hostfakesplit для discord.media/gateway, STUN + UDP 19294/50000-65535 с ipset, двусторонний WinDivert.
 
-✦ Telegram Web: hosts-файл
-Домены web.telegram.org → рабочий DC, DNS сбрасывается автоматически.
+✦ Telegram Web + Desktop
+hosts для web.telegram.org, tg-ws-proxy для ПК-приложения.
 
-✦ Telegram Desktop
-tg-ws-proxy запускается только если движок успешно стартовал.";
+✦ Стабильность
+Исправлен вылет движка (неверный payload filter).";
     }
 
     private void AutoImportClassicPresets(bool force = false)
