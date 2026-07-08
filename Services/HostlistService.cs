@@ -92,14 +92,15 @@ public sealed class HostlistService
         Write("general",  string.Join('\n', DefaultGeneral));
         WriteIpset("telegram", string.Join('\n', DefaultTelegramIpset));
         WriteIpset("telegram-bypass", string.Join('\n', DefaultTelegramBypassIpset));
-        SeedDiscordIpset();
+        SeedBundledIpset("discord");
+        SeedBundledIpset("youtube");
     }
 
-    private void SeedDiscordIpset()
+    private static void SeedBundledIpset(string name)
     {
-        string bundled = Path.Combine(AppPaths.ClassicDataDir, "lists", "ipset-discord.txt");
+        string bundled = Path.Combine(AppPaths.ClassicDataDir, "lists", $"ipset-{name}.txt");
         if (File.Exists(bundled))
-            WriteIpset("discord", File.ReadAllText(bundled));
+            File.WriteAllText(AppPaths.IpsetFile(name), NormalizeNewlines(File.ReadAllText(bundled)));
     }
 
     private void WriteIpset(string name, string content)

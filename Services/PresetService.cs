@@ -171,43 +171,28 @@ public sealed class PresetService
         });
     }
 
-    /// <summary>Per-service profiles (Discord first for speed, then Telegram / YouTube).</summary>
-    private static void AppendServiceProfiles(List<string> a, IReadOnlyList<string> youtubeTlsDesync)
+    /// <summary>Proven tls_multisplit chain from Default multisplit_sni (YouTube + Discord TCP).</summary>
+    private static readonly string[] FastTls =
+    [
+        "--lua-desync=send:repeats=1",
+        "--lua-desync=syndata:blob=tls_google",
+        "--lua-desync=tls_multisplit_sni:seqovl=652:seqovl_pattern=tls_google",
+    ];
+
+    private static readonly string[] FastTlsDiscordOnly =
+    [
+        "--lua-desync=tls_multisplit_sni:seqovl=652:seqovl_pattern=tls_google",
+    ];
+
+    /// <summary>YouTube → Discord → Telegram (Default multisplit_sni + v3 web TG).</summary>
+    private static void AppendServiceProfiles(List<string> a)
     {
-        AppendDiscordProfiles(a, youtubeTlsDesync, firstSegment: true);
-
-        a.Add("--new");
+        AppendYoutubeProfiles(a, firstSegment: true);
+        AppendDiscordProfiles(a, firstSegment: false);
         AppendTelegramProfiles(a, firstSegment: false);
-
-        a.Add("--new");
-        a.AddRange(new[]
-        {
-            "--filter-tcp=80,443",
-            "--hostlist-domains=googlevideo.com",
-            "--out-range=-d8",
-        });
-        a.AddRange(youtubeTlsDesync);
-        a.Add("--new");
-        a.AddRange(new[]
-        {
-            "--filter-tcp=80,443",
-            "{HOSTLIST:youtube}",
-            "--out-range=-d8",
-        });
-        a.AddRange(youtubeTlsDesync);
-        a.Add("--new");
-        a.AddRange(new[]
-        {
-            "--filter-udp=443",
-            "{IPSET:youtube}",
-            "--out-range=-n8",
-            "--payload=all",
-            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=8:payload=all",
-        });
     }
 
-    /// <summary>Discord web + desktop — YouTube-fast tls_multisplit first, then media/voice.</summary>
-    private static void AppendDiscordProfiles(List<string> a, IReadOnlyList<string> fastTls, bool firstSegment = false)
+    private static void AppendYoutubeProfiles(List<string> a, bool firstSegment)
     {
         void Next()
         {
@@ -215,60 +200,85 @@ public sealed class PresetService
             firstSegment = false;
         }
 
-        // #1 Fast path — same tls_multisplit chain as YouTube (instant bypass on first packet).
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "--hostlist-domains=googlevideo.com",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{HOSTLIST:youtube}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-udp=443",
+            "{IPSET:youtube}",
+            "--out-range=-n8",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=6:payload=all",
+        });
+    }
+
+    private static void AppendDiscordProfiles(List<string> a, bool firstSegment)
+    {
+        void Next()
+        {
+            if (!firstSegment) a.Add("--new");
+            firstSegment = false;
+        }
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "--hostlist-domains=updates.discord.com,gateway.discord.gg,remote-auth-gateway.discord.gg",
+            "--out-range=-d2",
+        });
+        a.AddRange(FastTlsDiscordOnly);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
+            "--hostlist-domains=discord.media,cdn.discordapp.com,media.discordapp.net",
+            "--out-range=-d2",
+        });
+        a.AddRange(FastTlsDiscordOnly);
+
         Next();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
             "{HOSTLIST:discord}",
-            "--payload=all",
-            "--out-range=-d8",
+            "--out-range=-n2",
         });
-        a.AddRange(fastTls);
+        a.AddRange(FastTlsDiscordOnly);
 
-        // #2 Desktop WebSocket + updates (explicit — desktop opens gateway first).
-        Next();
-        a.AddRange(new[]
-        {
-            "--filter-tcp=443",
-            "--hostlist-domains=gateway.discord.gg,updates.discord.com,remote-auth-gateway.discord.gg",
-            "--payload=all",
-            "--out-range=-d8",
-        });
-        a.AddRange(fastTls);
-
-        // #3 Media/CDN TLS — hostfakesplit for voice relay endpoints.
-        Next();
-        a.AddRange(new[]
-        {
-            "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
-            "--hostlist-domains=discord.media,cdn.discordapp.com,media.discordapp.net,latency.discord.media",
-            "--payload=all",
-            "--out-range=-d8",
-            "--lua-desync=send:repeats=2",
-            "--lua-desync=syndata:blob=tls_google",
-            "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2",
-        });
-
-        // #4 IP-based (media DC) — don't steal web SNI.
         Next();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
             "{IPSET:discord}",
-            "{EXCLUDE:discord}",
-            "--payload=all",
-            "--out-range=-d8",
+            "--out-range=-n2",
         });
-        a.AddRange(fastTls);
+        a.AddRange(FastTlsDiscordOnly);
 
-        // Voice/STUN — reduced repeats for lower latency.
         Next();
         a.AddRange(new[]
         {
             "--filter-l7=stun,discord",
             "--payload=stun,discord_ip_discovery",
-            "--out-range=-n8",
+            "--out-range=-n2",
             "--lua-desync=fake:blob=stun_pat:repeats=2",
         });
 
@@ -292,21 +302,19 @@ public sealed class PresetService
             "--payload=all",
             "--lua-desync=fake:blob=stun_pat:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
             "--lua-desync=fake:blob=quic2:repeats=4",
-            "--lua-desync=udplen:increment=5:pattern=0xDEADBEEF",
         });
     }
 
-    /// <summary>Telegram web (TLS/SNI) + desktop MTProto (DC ipset). No seqovl — it breaks MTProto.</summary>
-    private static void AppendTelegramProfiles(List<string> a, bool firstSegment = false)
+    /// <summary>Telegram web (hostfakesplit, no seqovl) + desktop MTProto (ipset pass).</summary>
+    private static void AppendTelegramProfiles(List<string> a, bool firstSegment)
     {
-        void NextProfile()
+        void Next()
         {
             if (!firstSegment) a.Add("--new");
             firstSegment = false;
         }
 
-        // Web: Default v3 — hostfakesplit_multi (no seqovl).
-        NextProfile();
+        Next();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,5222",
@@ -318,40 +326,24 @@ public sealed class PresetService
             "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2",
         });
 
-        // Web: explicit WS/CDN domains.
-        NextProfile();
+        Next();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,5222",
-            "--hostlist-domains=web.telegram.org,pluto.web.telegram.org,zws1.web.telegram.org,zws2.web.telegram.org,zws2-1.web.telegram.org,zws3.web.telegram.org,zws4.web.telegram.org,zws4-1.web.telegram.org,zws5.web.telegram.org,kws2.web.telegram.org,kws4.web.telegram.org,venus.web.telegram.org,vesta.web.telegram.org,api.telegram.org",
-            "--payload=all",
-            "--out-range=-n8",
-            "--lua-desync=send:repeats=3",
-            "--lua-desync=syndata:blob=tls_google",
-            "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=3",
-        });
-
-        // Web fallback: small multidisorder (TLS only, web domains).
-        NextProfile();
-        a.AddRange(new[]
-        {
-            "--filter-tcp=80,443,5222",
-            "--hostlist-domains=web.telegram.org,api.telegram.org,pluto.web.telegram.org",
+            "--hostlist-domains=web.telegram.org,pluto.web.telegram.org,zws1.web.telegram.org,zws2.web.telegram.org,zws3.web.telegram.org,zws4.web.telegram.org,zws5.web.telegram.org,api.telegram.org",
             "--payload=all",
             "--out-range=-n8",
             "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=tls_google",
-            "--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1",
+            "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=3",
         });
 
-        // Desktop MTProto DC — exclude telegram SNI so web TLS profiles win on DC IP + SNI.
-        NextProfile();
+        Next();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,5222",
             "{IPSET:telegram}",
             "{IPSET:telegram-bypass}",
-            "{EXCLUDE:telegram}",
             "--payload=all",
             "--out-range=-n8",
             "--lua-desync=send:repeats=2",
@@ -359,17 +351,15 @@ public sealed class PresetService
             "--lua-desync=pass",
         });
 
-        // Desktop MTProto alt — fake stun (no seqovl).
-        NextProfile();
+        Next();
         a.AddRange(new[]
         {
             "--filter-tcp=443",
             "{IPSET:telegram}",
             "{IPSET:telegram-bypass}",
-            "{EXCLUDE:telegram}",
             "--payload=all",
             "--out-range=-n8",
-            "--lua-desync=fake:blob=stun_pat:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=8",
+            "--lua-desync=fake:blob=stun_pat:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=6",
         });
     }
 
@@ -397,17 +387,10 @@ public sealed class PresetService
 
     public static List<string> BuildComboArgs(string? discordFilter = null, string[]? proxyTls = null)
     {
-        string[] youtubeTls =
-        [
-            "--lua-desync=send:repeats=2",
-            "--lua-desync=syndata:blob=stun_pat:repeats=2",
-            "--lua-desync=tls_multisplit_sni:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20",
-        ];
-
         var a = new List<string>();
         AppendGlobalSetup(a);
-        AppendServiceProfiles(a, youtubeTls);
-        AppendCatchAllFallback(a, youtubeTls);
+        AppendServiceProfiles(a);
+        AppendCatchAllFallback(a, FastTls);
 
         if (proxyTls is not null)
         {
@@ -430,7 +413,7 @@ public sealed class PresetService
         ];
         var a = new List<string>();
         AppendGlobalSetup(a);
-        AppendServiceProfiles(a, youtubeTls);
+        AppendServiceProfiles(a);
         AppendCatchAllFallback(a, youtubeTls);
         return a;
     }
@@ -446,7 +429,7 @@ public sealed class PresetService
         ];
         var a = new List<string>();
         AppendGlobalSetup(a);
-        AppendServiceProfiles(a, youtubeTls);
+        AppendServiceProfiles(a);
         AppendCatchAllFallback(a, youtubeTls);
         return a;
     }
@@ -461,7 +444,7 @@ public sealed class PresetService
         ];
         var a = new List<string>();
         AppendGlobalSetup(a);
-        AppendServiceProfiles(a, youtubeTls);
+        AppendServiceProfiles(a);
         AppendCatchAllFallback(a, youtubeTls);
         return a;
     }
@@ -477,7 +460,7 @@ public sealed class PresetService
         ];
         var a = new List<string>();
         AppendGlobalSetup(a);
-        AppendServiceProfiles(a, youtubeTls);
+        AppendServiceProfiles(a);
         AppendCatchAllFallback(a, youtubeTls);
         return a;
     }

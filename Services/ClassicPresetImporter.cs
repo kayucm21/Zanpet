@@ -199,9 +199,16 @@ public sealed class ClassicPresetImporter
         string srcLists = Path.Combine(sourceDir, "lists");
         if (Directory.Exists(srcLists))
         {
-            foreach (var f in Directory.EnumerateFiles(srcLists, "*.txt"))
+            foreach (var f in Directory.EnumerateFiles(srcLists, "ipset-*.txt"))
             {
                 string dest = Path.Combine(listsDir, Path.GetFileName(f));
+                File.Copy(f, dest, overwrite: true);
+            }
+            foreach (var f in Directory.EnumerateFiles(srcLists, "*.txt"))
+            {
+                string name = Path.GetFileName(f);
+                if (name.StartsWith("ipset-", StringComparison.OrdinalIgnoreCase)) continue;
+                string dest = Path.Combine(listsDir, name);
                 if (!File.Exists(dest))
                     File.Copy(f, dest, overwrite: false);
             }

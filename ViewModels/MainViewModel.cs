@@ -547,14 +547,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Discord: быстрый обход
-Discord первый в цепочке + tls_multisplit как у YouTube. gateway.discord.gg на отдельный IP.
+        return @"✦ YouTube + Discord + Telegram
+Стратегия переписана по Default multisplit_sni: tls_multisplit для YT/Discord, hostfakesplit для веб-TG.
 
-✦ Discord веб + ПК
-hosts + мгновенный TLS на первом пакете, без лишних профилей.
+✦ ipset YouTube/Discord
+Всегда обновляются из ClassicData — QUIC и медиа Discord снова попадают в обход.
 
-✦ Telegram
-hosts + tg-ws-proxy для десктопа.";
+✦ Telegram Desktop
+tg-ws-proxy с config.json + автоссылка tg:// для MTProto 127.0.0.1:1443.";
     }
 
     private void AutoImportClassicPresets(bool force = false)
