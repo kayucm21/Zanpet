@@ -125,8 +125,8 @@ public sealed class HostlistService
     /// zapret matches subdomains, so the base domains are enough.</summary>
     private static readonly string[] DefaultDiscord =
     {
-        "dis.gd", "discord.com", "www.discord.com", "discord.gg", "gateway.discord.gg", "discord.media",
-        "latency.discord.media", "discord.app", "discord.co",
+        "dis.gd", "discord.com", "www.discord.com", "discord.gg", "gateway.discord.gg",
+        "remote-auth-gateway.discord.gg", "discord.media", "latency.discord.media", "discord.app", "discord.co",
         "discord.dev", "discord.design", "discord.gift", "discord.gifts",
         "discord.new", "discord.store", "discord.status",
         "discordapp.com", "discordapp.net", "cdn.discordapp.com", "media.discordapp.net",

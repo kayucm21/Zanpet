@@ -13,17 +13,22 @@ public sealed class DiscordHostsService
     private const string BeginMarker = "# BEGIN ZAPRETUI DISCORD";
     private const string EndMarker = "# END ZAPRETUI DISCORD";
 
-    /// <summary>Cloudflare edge — from Flowseal ipset-discord / discord.com A-record.</summary>
-    private const string EdgeIp = "162.159.128.233";
-
-    private static readonly string[] Domains =
-    {
-        "discord.com", "www.discord.com", "discordapp.com", "status.discord.com",
-        "gateway.discord.gg", "updates.discord.com",
-        "cdn.discordapp.com", "media.discordapp.net", "images-ext-1.discordapp.net",
-        "discord.media", "latency.discord.media",
-        "challenges.cloudflare.com",
-    };
+    /// <summary>Cloudflare edges — gateway gets a dedicated IP for faster desktop WebSocket.</summary>
+    private static readonly (string Ip, string[] Domains)[] Entries =
+    [
+        ("162.159.137.232", new[]
+        {
+            "gateway.discord.gg", "discord.gg", "latency.discord.media",
+        }),
+        ("162.159.128.233", new[]
+        {
+            "discord.com", "www.discord.com", "discordapp.com", "status.discord.com",
+            "updates.discord.com",
+            "cdn.discordapp.com", "media.discordapp.net", "images-ext-1.discordapp.net",
+            "discord.media", "remote-auth-gateway.discord.gg",
+            "challenges.cloudflare.com",
+        }),
+    ];
 
     private static string HostsPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"drivers\etc\hosts");
@@ -42,13 +47,20 @@ public sealed class DiscordHostsService
             var block = new StringBuilder();
             block.AppendLine();
             block.AppendLine(BeginMarker);
-            foreach (var d in Domains)
-                block.AppendLine($"{EdgeIp} {d}");
+            int count = 0;
+            foreach (var (ip, domains) in Entries)
+            {
+                foreach (var d in domains)
+                {
+                    block.AppendLine($"{ip} {d}");
+                    count++;
+                }
+            }
             block.AppendLine(EndMarker);
             File.WriteAllText(HostsPath, text.TrimEnd() + block.ToString());
             FlushDns();
             IsApplied = true;
-            Emit($"Discord: hosts → {EdgeIp} ({Domains.Length} доменов)");
+            Emit($"Discord: hosts ({count} доменов, gateway → 162.159.137.232)");
             return true;
         }
         catch (Exception ex)

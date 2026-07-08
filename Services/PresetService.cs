@@ -171,13 +171,13 @@ public sealed class PresetService
         });
     }
 
-    /// <summary>Per-service profiles (YouTube / Discord / Telegram) scoped by hostlist or ipset.</summary>
+    /// <summary>Per-service profiles (Discord first for speed, then Telegram / YouTube).</summary>
     private static void AppendServiceProfiles(List<string> a, IReadOnlyList<string> youtubeTlsDesync)
     {
-        AppendTelegramProfiles(a, firstSegment: true);
+        AppendDiscordProfiles(a, youtubeTlsDesync, firstSegment: true);
 
         a.Add("--new");
-        AppendDiscordProfiles(a);
+        AppendTelegramProfiles(a, firstSegment: false);
 
         a.Add("--new");
         a.AddRange(new[]
@@ -206,123 +206,92 @@ public sealed class PresetService
         });
     }
 
-    /// <summary>Discord site + voice/media (Default v3 style hostfakesplit + STUN/UDP voice).</summary>
-    private static void AppendDiscordProfiles(List<string> a)
+    /// <summary>Discord web + desktop — YouTube-fast tls_multisplit first, then media/voice.</summary>
+    private static void AppendDiscordProfiles(List<string> a, IReadOnlyList<string> fastTls, bool firstSegment = false)
     {
-        string[] discordTls =
-        [
-            "--lua-desync=send:repeats=3",
-            "--lua-desync=syndata:blob=tls_google",
-            "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2",
-        ];
-
-        // Web + desktop login (discord.com) — first.
-        a.AddRange(new[]
+        void Next()
         {
-            "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
-            "--hostlist-domains=discord.com,www.discord.com,discordapp.com,status.discord.com,challenges.cloudflare.com",
-            "--payload=all",
-            "--out-range=-d10",
-        });
-        a.AddRange(discordTls);
+            if (!firstSegment) a.Add("--new");
+            firstSegment = false;
+        }
 
-        a.Add("--new");
-        a.AddRange(new[]
-        {
-            "--filter-tcp=443",
-            "--hostlist-domains=updates.discord.com,gateway.discord.gg",
-            "--payload=all",
-            "--out-range=-d10",
-        });
-        a.AddRange(discordTls);
-
-        a.Add("--new");
+        // #1 Fast path — same tls_multisplit chain as YouTube (instant bypass on first packet).
+        Next();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
             "{HOSTLIST:discord}",
             "--payload=all",
-            "--out-range=-d10",
+            "--out-range=-d8",
         });
-        a.AddRange(discordTls);
+        a.AddRange(fastTls);
 
-        a.Add("--new");
+        // #2 Desktop WebSocket + updates (explicit — desktop opens gateway first).
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "--hostlist-domains=gateway.discord.gg,updates.discord.com,remote-auth-gateway.discord.gg",
+            "--payload=all",
+            "--out-range=-d8",
+        });
+        a.AddRange(fastTls);
+
+        // #3 Media/CDN TLS — hostfakesplit for voice relay endpoints.
+        Next();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
             "--hostlist-domains=discord.media,cdn.discordapp.com,media.discordapp.net,latency.discord.media",
             "--payload=all",
-            "--out-range=-d10",
-        });
-        a.AddRange(discordTls);
-
-        // Web fallback — small multidisorder for discord.com TLS.
-        a.Add("--new");
-        a.AddRange(new[]
-        {
-            "--filter-tcp=80,443",
-            "--hostlist-domains=discord.com,www.discord.com,discordapp.com",
-            "--payload=all",
-            "--out-range=-d10",
+            "--out-range=-d8",
             "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=tls_google",
-            "--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1",
+            "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2",
         });
 
-        a.Add("--new");
+        // #4 IP-based (media DC) — don't steal web SNI.
+        Next();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
             "{IPSET:discord}",
             "{EXCLUDE:discord}",
             "--payload=all",
-            "--out-range=-d10",
+            "--out-range=-d8",
         });
-        a.AddRange(discordTls);
+        a.AddRange(fastTls);
 
-        // Voice/STUN discovery (Discord RTC).
-        a.Add("--new");
+        // Voice/STUN — reduced repeats for lower latency.
+        Next();
         a.AddRange(new[]
         {
             "--filter-l7=stun,discord",
             "--payload=stun,discord_ip_discovery",
             "--out-range=-n8",
-            "--lua-desync=fake:blob=stun_pat:repeats=4",
-            "--lua-desync=fake:blob=fake_default_udp",
+            "--lua-desync=fake:blob=stun_pat:repeats=2",
         });
 
-        a.Add("--new");
+        Next();
         a.AddRange(new[]
         {
             "--filter-udp=443",
             "{IPSET:discord}",
             "--out-range=-n8",
             "--payload=all",
-            "--lua-desync=fake:blob=quic2:repeats=7",
+            "--lua-desync=fake:blob=quic2:repeats=4",
             "--lua-desync=udplen:increment=5:pattern=0xDEADBEEF",
         });
 
-        // Voice/media UDP (19294 + 50000-65535) — ipset-scoped like Default v5.
-        a.Add("--new");
+        Next();
         a.AddRange(new[]
         {
             "--filter-udp=19294-19344,50000-65535",
             "{IPSET:discord}",
             "--out-range=-n8",
             "--payload=all",
-            "--lua-desync=fake:blob=stun_pat:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=4",
-            "--lua-desync=fake:blob=quic2:repeats=7",
-            "--lua-desync=udplen:increment=5:pattern=0xDEADBEEF",
-        });
-
-        a.Add("--new");
-        a.AddRange(new[]
-        {
-            "--filter-udp=444-65535",
-            "{IPSET:discord}",
-            "--out-range=-n8",
-            "--payload=all",
-            "--lua-desync=fake:blob=quic2:repeats=7",
+            "--lua-desync=fake:blob=stun_pat:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
+            "--lua-desync=fake:blob=quic2:repeats=4",
             "--lua-desync=udplen:increment=5:pattern=0xDEADBEEF",
         });
     }

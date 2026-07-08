@@ -547,14 +547,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Discord: веб + ПК-приложение
-hosts для discord.com → Cloudflare, hostfakesplit + multidisorder, ipset не перехватывает TLS.
+        return @"✦ Discord: быстрый обход
+Discord первый в цепочке + tls_multisplit как у YouTube. gateway.discord.gg на отдельный IP.
 
-✦ Discord: голос
-STUN + UDP 19294/50000-65535 с ipset-discord.
+✦ Discord веб + ПК
+hosts + мгновенный TLS на первом пакете, без лишних профилей.
 
 ✦ Telegram
-hosts для web.telegram.org, tg-ws-proxy для десктопа.";
+hosts + tg-ws-proxy для десктопа.";
     }
 
     private void AutoImportClassicPresets(bool force = false)
@@ -763,10 +763,10 @@ hosts для web.telegram.org, tg-ws-proxy для десктопа.";
         }
         try
         {
-            if (Settings.TelegramWebHosts && PresetHasService(SelectedPreset, "Telegram"))
-                _telegramHosts.Apply();
             if (Settings.DiscordWebHosts && PresetHasService(SelectedPreset, "Discord"))
                 _discordHosts.Apply();
+            if (Settings.TelegramWebHosts && PresetHasService(SelectedPreset, "Telegram"))
+                _telegramHosts.Apply();
 
             _engine.Start(SelectedPreset, SelectedPreset.UsesHostlist ? null : null);
             RunningPreset = SelectedPreset;
