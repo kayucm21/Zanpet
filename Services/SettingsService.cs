@@ -40,6 +40,9 @@ public sealed class AppSettings
     /// <summary>Auto-start Flowseal tg-ws-proxy for Telegram Desktop (MTProto→WebSocket).</summary>
     public bool TelegramWsProxy { get; set; } = true;
 
+    /// <summary>Write Windows hosts entries for web.telegram.org (Flowseal community fix).</summary>
+    public bool TelegramWebHosts { get; set; } = true;
+
     /// <summary>Fixed MTProto secret for tg-ws-proxy (32 hex chars).</summary>
     public string TelegramWsProxySecret { get; set; } = "eecb9b9a39b6f0d6e8c4a2b1f0d3e7a";
 

@@ -136,8 +136,14 @@ public sealed class HostlistService
     private static readonly string[] DefaultTelegram =
     {
         "telegram.org", "web.telegram.org", "pluto.web.telegram.org",
-        "zws1.web.telegram.org", "zws2.web.telegram.org", "zws3.web.telegram.org",
-        "zws4.web.telegram.org", "zws5.web.telegram.org", "k.telegram.org",
+        "zws1.web.telegram.org", "zws2.web.telegram.org", "zws2-1.web.telegram.org",
+        "zws3.web.telegram.org", "zws4.web.telegram.org", "zws4-1.web.telegram.org",
+        "zws5.web.telegram.org",
+        "kws2.web.telegram.org", "kws2-1.web.telegram.org",
+        "kws4.web.telegram.org", "kws4-1.web.telegram.org",
+        "venus.web.telegram.org", "venus-1.web.telegram.org",
+        "vesta.web.telegram.org", "vesta-1.web.telegram.org",
+        "api.telegram.org", "td.telegram.org", "cdn.telegram.org", "k.telegram.org",
         "t.me", "telegram.me", "tx.me", "teleg.xyz",
         "telegra.ph", "graph.org", "telesco.pe", "comments.app",
         "fragment.com", "contest.com", "quiz.directory",

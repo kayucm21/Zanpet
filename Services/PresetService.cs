@@ -285,12 +285,12 @@ public sealed class PresetService
             "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2",
         });
 
-        // Web: explicit WS/CDN domains (hostfakesplit only — multidisorder breaks web.telegram.org).
+        // Web: explicit WS/CDN domains.
         NextProfile();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,5222",
-            "--hostlist-domains=web.telegram.org,pluto.web.telegram.org,zws1.web.telegram.org,zws2.web.telegram.org,zws3.web.telegram.org,zws4.web.telegram.org,zws5.web.telegram.org,k.telegram.org",
+            "--hostlist-domains=web.telegram.org,pluto.web.telegram.org,zws1.web.telegram.org,zws2.web.telegram.org,zws2-1.web.telegram.org,zws3.web.telegram.org,zws4.web.telegram.org,zws4-1.web.telegram.org,zws5.web.telegram.org,kws2.web.telegram.org,kws4.web.telegram.org,venus.web.telegram.org,vesta.web.telegram.org,api.telegram.org",
             "--payload=all",
             "--out-range=-n8",
             "--lua-desync=send:repeats=3",
@@ -298,13 +298,27 @@ public sealed class PresetService
             "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=3",
         });
 
-        // Desktop MTProto DC — Default v4 proven chain.
+        // Web fallback: small multidisorder (TLS only, web domains).
+        NextProfile();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,5222",
+            "--hostlist-domains=web.telegram.org,api.telegram.org,pluto.web.telegram.org",
+            "--payload=tls,http",
+            "--out-range=-n8",
+            "--lua-desync=send:repeats=2",
+            "--lua-desync=syndata:blob=tls_google",
+            "--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1",
+        });
+
+        // Desktop MTProto DC — exclude telegram SNI so web TLS profiles win on DC IP + SNI.
         NextProfile();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,5222",
             "{IPSET:telegram}",
             "{IPSET:telegram-bypass}",
+            "{EXCLUDE:telegram}",
             "--payload=all",
             "--out-range=-n8",
             "--lua-desync=send:repeats=2",
@@ -319,6 +333,7 @@ public sealed class PresetService
             "--filter-tcp=443",
             "{IPSET:telegram}",
             "{IPSET:telegram-bypass}",
+            "{EXCLUDE:telegram}",
             "--payload=all",
             "--out-range=-n8",
             "--lua-desync=fake:blob=stun_pat:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=8",

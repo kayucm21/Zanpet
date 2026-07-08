@@ -179,8 +179,8 @@ public sealed class EngineService : IDisposable
                  || a.Contains("http", StringComparison.Ordinal)));
             first = false;
 
-            if (ex < 0 && !bareGlobal)
-                result.AddRange(profile);                       // normal (listed/scoped) profile — keep
+            if (scoped || (ex < 0 && !bareGlobal))
+                result.AddRange(profile);                       // scoped or normal listed profile — keep
             else if (ex >= 0 && hasTargets)
             {
                 profile[ex] = $"--hostlist={targetsPath}";       // exclude catch-all → targets-only

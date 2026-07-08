@@ -22,6 +22,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly MonitorService _monitor = new();
     private readonly VpnService _vpn = new();
     private readonly TgWsProxyService _tgWs = new();
+    private readonly TelegramHostsService _telegramHosts = new();
 
     public event Action<string, string>? Notify;
 
@@ -33,10 +34,14 @@ public sealed class MainViewModel : ObservableObject
         {
             State = s;
             if (s == EngineState.Stopped)
+            {
                 _tgWs.Stop();
+                _telegramHosts.Remove();
+            }
         });
         _engine.LogLine += line => OnUi(() => AppendLog(line));
         _tgWs.LogLine += line => OnUi(() => AppendLog(line));
+        _telegramHosts.LogLine += line => OnUi(() => AppendLog(line));
 
         StartCommand = new RelayCommand(_ => Start(), _ => CanStart);
         StopCommand = new RelayCommand(_ => _engine.Stop(), _ => CanStop);
@@ -539,14 +544,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Telegram Desktop: автонастройка прокси
-tg-ws-proxy пишет config.json и открывает tg:// ссылку — прокси 127.0.0.1:1443 включается в Telegram автоматически.
+        return @"✦ Telegram Web: hosts-файл
+При обходе прописываются домены web.telegram.org → рабочий DC (как в Flowseal). DNS сбрасывается автоматически.
 
-✦ Исправлен веб-Telegram
-Убран multidisorder (ломал TLS). Только hostfakesplit_multi для web.telegram.org и zws1-5.
+✦ Разделены веб и MTProto
+TLS-профили для web.telegram.org; ipset-профили не трогают веб-SNI.
 
-✦ Надёжная загрузка TgWsProxy
-Зеркало SourceForge, если GitHub недоступен.";
+✦ Telegram Desktop
+tg-ws-proxy с автонастройкой через tg:// ссылку.";
     }
 
     private void AutoImportClassicPresets(bool force = false)
@@ -755,6 +760,9 @@ tg-ws-proxy пишет config.json и открывает tg:// ссылку — 
         }
         try
         {
+            if (Settings.TelegramWebHosts && PresetNeedsTelegramProxy(SelectedPreset))
+                _telegramHosts.Apply();
+
             _engine.Start(SelectedPreset, SelectedPreset.UsesHostlist ? null : null);
             RunningPreset = SelectedPreset;
             if (Settings.TelegramWsProxy && PresetNeedsTelegramProxy(SelectedPreset))
@@ -874,6 +882,7 @@ tg-ws-proxy пишет config.json и открывает tg:// ссылку — 
 
     public void Shutdown()
     {
+        try { _telegramHosts.Remove(); } catch { }
         try { _monitor.Dispose(); } catch { }
         try { _vpn.Dispose(); } catch { }
         try { _engine.Dispose(); } catch { }
