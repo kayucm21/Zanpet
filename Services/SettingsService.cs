@@ -37,7 +37,7 @@ public sealed class AppSettings
     /// <summary>Theme mode: "dark" (default) or "light".</summary>
     public string Theme { get; set; } = "dark";
 
-    /// <summary>Auto-start Flowseal tg-ws-proxy for Telegram Desktop (MTProto→WebSocket).</summary>
+    /// <summary>Auto-connect Telegram Desktop (silent MTProto bridge, no manual proxy setup).</summary>
     public bool TelegramWsProxy { get; set; } = true;
 
     /// <summary>Write Windows hosts entries for discord.com (Cloudflare edge pin).</summary>

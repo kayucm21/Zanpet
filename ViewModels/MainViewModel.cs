@@ -547,14 +547,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ YouTube + Discord + Telegram
-Стратегия переписана по Default multisplit_sni: tls_multisplit для YT/Discord, hostfakesplit для веб-TG.
+        return @"✦ Telegram Desktop — автоподключение
+Программа сама подхватывает Telegram на ПК: тихий мост + автоприменение, без ручной настройки прокси.
 
-✦ ipset YouTube/Discord
-Всегда обновляются из ClassicData — QUIC и медиа Discord снова попадают в обход.
+✦ MTProto обход DC
+Профили Telegram Desktop теперь первые в цепочке (send + fake + fakedsplit).
 
-✦ Telegram Desktop
-tg-ws-proxy с config.json + автоссылка tg:// для MTProto 127.0.0.1:1443.";
+✦ Веб-Telegram
+Без изменений — hostfakesplit + hosts.";
     }
 
     private void AutoImportClassicPresets(bool force = false)
@@ -783,9 +783,6 @@ tg-ws-proxy с config.json + автоссылка tg:// для MTProto 127.0.0.1
     private static bool PresetHasService(Preset preset, string service) =>
         preset.Name.Contains(service, StringComparison.OrdinalIgnoreCase);
 
-    private static bool PresetNeedsTelegramProxy(Preset preset) =>
-        PresetHasService(preset, "Telegram");
-
     private async Task StartTelegramProxyAsync()
     {
         try
@@ -794,9 +791,9 @@ tg-ws-proxy с config.json + автоссылка tg:// для MTProto 127.0.0.1
                 _tgWs.Secret = Settings.TelegramWsProxySecret.Trim();
             await _tgWs.StartAsync();
         }
-        catch (Exception ex)
+        catch
         {
-            AppendLog($"Telegram WS Proxy: {ex.Message}");
+            /* silent — winws MTProto profiles still work */
         }
     }
 

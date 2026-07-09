@@ -184,12 +184,13 @@ public sealed class PresetService
         "--lua-desync=tls_multisplit_sni:seqovl=652:seqovl_pattern=tls_google",
     ];
 
-    /// <summary>YouTube → Discord → Telegram (Default multisplit_sni + v3 web TG).</summary>
+    /// <summary>YouTube → Discord → Telegram (web + desktop MTProto first).</summary>
     private static void AppendServiceProfiles(List<string> a)
     {
-        AppendYoutubeProfiles(a, firstSegment: true);
+        AppendTelegramDesktopProfiles(a, firstSegment: true);
+        AppendYoutubeProfiles(a, firstSegment: false);
         AppendDiscordProfiles(a, firstSegment: false);
-        AppendTelegramProfiles(a, firstSegment: false);
+        AppendTelegramWebProfiles(a, firstSegment: false);
     }
 
     private static void AppendYoutubeProfiles(List<string> a, bool firstSegment)
@@ -305,8 +306,64 @@ public sealed class PresetService
         });
     }
 
-    /// <summary>Telegram web (hostfakesplit, no seqovl) + desktop MTProto (ipset pass).</summary>
-    private static void AppendTelegramProfiles(List<string> a, bool firstSegment)
+    /// <summary>Telegram Desktop MTProto to DC IPs — highest priority, no seqovl.</summary>
+    private static void AppendTelegramDesktopProfiles(List<string> a, bool firstSegment)
+    {
+        void Next()
+        {
+            if (!firstSegment) a.Add("--new");
+            firstSegment = false;
+        }
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,5222",
+            "{IPSET:telegram}",
+            "{IPSET:telegram-bypass}",
+            "--payload=all",
+            "--out-range=-n8",
+            "--lua-desync=send:repeats=2",
+            "--lua-desync=syndata:blob=tls_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20",
+            "--lua-desync=pass",
+        });
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "{IPSET:telegram}",
+            "{IPSET:telegram-bypass}",
+            "--payload=all",
+            "--out-range=-n8",
+            "--lua-desync=fake:blob=tls_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=6",
+        });
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "{IPSET:telegram}",
+            "{IPSET:telegram-bypass}",
+            "--payload=all",
+            "--out-range=-n8",
+            "--lua-desync=fakedsplit:pos=1:blob=tls_google:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
+        });
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "{IPSET:telegram}",
+            "{IPSET:telegram-bypass}",
+            "--payload=all",
+            "--out-range=-n8",
+            "--lua-desync=fake:blob=stun_pat:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=8",
+        });
+    }
+
+    /// <summary>Telegram web (hostfakesplit, no seqovl).</summary>
+    private static void AppendTelegramWebProfiles(List<string> a, bool firstSegment)
     {
         void Next()
         {
@@ -336,30 +393,6 @@ public sealed class PresetService
             "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=tls_google",
             "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=3",
-        });
-
-        Next();
-        a.AddRange(new[]
-        {
-            "--filter-tcp=80,443,5222",
-            "{IPSET:telegram}",
-            "{IPSET:telegram-bypass}",
-            "--payload=all",
-            "--out-range=-n8",
-            "--lua-desync=send:repeats=2",
-            "--lua-desync=syndata:blob=tls_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20",
-            "--lua-desync=pass",
-        });
-
-        Next();
-        a.AddRange(new[]
-        {
-            "--filter-tcp=443",
-            "{IPSET:telegram}",
-            "{IPSET:telegram-bypass}",
-            "--payload=all",
-            "--out-range=-n8",
-            "--lua-desync=fake:blob=stun_pat:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=6",
         });
     }
 

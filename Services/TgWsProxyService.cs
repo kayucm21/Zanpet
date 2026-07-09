@@ -7,9 +7,8 @@ using System.Text.Json;
 namespace ZapretUI.Services;
 
 /// <summary>
-/// Local MTProto→WebSocket bridge (Flowseal tg-ws-proxy) for Telegram Desktop.
-/// Raw MTProto to DC IPs is often blocked at ISP level; winws cannot fix that — this proxy
-/// tunnels desktop traffic through TLS to web.telegram.org instead.
+/// Local MTProto→WebSocket bridge for Telegram Desktop. Starts silently and applies the proxy
+/// to the running Telegram app — no manual settings required.
 /// </summary>
 public sealed class TgWsProxyService : IDisposable
 {
@@ -25,6 +24,8 @@ public sealed class TgWsProxyService : IDisposable
     private static readonly HttpClient Http = HttpFactory.General;
 
     private Process? _proc;
+    private CancellationTokenSource? _watchCts;
+    private int _proxyAppliedForPid;
 
     public string Secret { get; set; } = "eecb9b9a39b6f0d6e8c4a2b1f0d3e7a";
 
@@ -37,8 +38,7 @@ public sealed class TgWsProxyService : IDisposable
     private static string PortableDataDir => Path.Combine(ExeDir, "TgWsProxy_data");
     private static string ConfigPath => Path.Combine(PortableDataDir, "config.json");
 
-    /// <summary>tg:// deeplink to auto-enable the proxy in Telegram Desktop (dd + secret).</summary>
-    public string ProxyDeeplink =>
+    private string ProxyDeeplink =>
         $"tg://proxy?server={DefaultHost}&port={DefaultPort}&secret=dd{Secret}";
 
     public async Task EnsureInstalledAsync(CancellationToken ct = default)
@@ -46,7 +46,6 @@ public sealed class TgWsProxyService : IDisposable
         if (File.Exists(ExePath)) return;
 
         Directory.CreateDirectory(ExeDir);
-        Emit("Загрузка Telegram WS Proxy…");
 
         Exception? last = null;
         foreach (var url in new[] { DownloadUrl, DownloadMirrorUrl })
@@ -59,7 +58,6 @@ public sealed class TgWsProxyService : IDisposable
                 await using var src = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
                 await using var dst = new FileStream(ExePath, FileMode.Create, FileAccess.Write, FileShare.None);
                 await src.CopyToAsync(dst, ct).ConfigureAwait(false);
-                Emit("Telegram WS Proxy установлен.");
                 return;
             }
             catch (Exception ex)
@@ -69,7 +67,7 @@ public sealed class TgWsProxyService : IDisposable
         }
 
         throw new InvalidOperationException(
-            $"Не удалось скачать TgWsProxy: {last?.Message ?? "неизвестная ошибка"}");
+            $"Не удалось скачать компонент Telegram Desktop: {last?.Message ?? "неизвестная ошибка"}");
     }
 
     public async Task StartAsync(CancellationToken ct = default)
@@ -90,21 +88,123 @@ public sealed class TgWsProxyService : IDisposable
         };
 
         _proc = Process.Start(psi)
-            ?? throw new InvalidOperationException("Не удалось запустить TgWsProxy.");
+            ?? throw new InvalidOperationException("Не удалось запустить компонент Telegram Desktop.");
 
         if (!await WaitForListenAsync(DefaultHost, DefaultPort, TimeSpan.FromSeconds(12), ct).ConfigureAwait(false))
         {
             int code = _proc is { HasExited: true } p ? p.ExitCode : -1;
             throw new InvalidOperationException(
                 code >= 0
-                    ? $"TgWsProxy завершился (код {code}). Порт {DefaultPort} занят?"
-                    : $"TgWsProxy не слушает {DefaultHost}:{DefaultPort} — проверьте, не запущен ли другой экземпляр.");
+                    ? $"Компонент Telegram Desktop завершился (код {code})."
+                    : "Компонент Telegram Desktop не запустился.");
         }
 
-        Emit($"Telegram Desktop: MTProto прокси {DefaultHost}:{DefaultPort}");
-        Emit($"Secret (ручной ввод): dd{Secret}");
-        Emit("Открываю настройку прокси в Telegram…");
-        TryOpenTelegramProxy();
+        ApplyProxyToDesktop();
+        StartDesktopWatch(ct);
+    }
+
+    private void StartDesktopWatch(CancellationToken outerCt)
+    {
+        StopDesktopWatch();
+        _watchCts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
+        var token = _watchCts.Token;
+        _ = Task.Run(async () =>
+        {
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    if (IsRunning)
+                    {
+                        foreach (var p in Process.GetProcessesByName("Telegram"))
+                        {
+                            try
+                            {
+                                if (p.Id != _proxyAppliedForPid)
+                                {
+                                    _proxyAppliedForPid = p.Id;
+                                    ApplyProxyToDesktop();
+                                }
+                            }
+                            finally
+                            {
+                                p.Dispose();
+                            }
+                        }
+                    }
+                    await Task.Delay(2500, token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) { break; }
+                catch { /* best-effort */ }
+            }
+        }, token);
+    }
+
+    private void StopDesktopWatch()
+    {
+        try { _watchCts?.Cancel(); } catch { }
+        _watchCts?.Dispose();
+        _watchCts = null;
+        _proxyAppliedForPid = 0;
+    }
+
+    /// <summary>Push MTProto proxy into Telegram Desktop without user-facing instructions.</summary>
+    private void ApplyProxyToDesktop()
+    {
+        string? telegramExe = FindTelegramExe();
+        try
+        {
+            if (telegramExe is not null)
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = telegramExe,
+                    Arguments = $"-- \"{ProxyDeeplink}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                });
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo(ProxyDeeplink) { UseShellExecute = true });
+        }
+        catch
+        {
+            /* silent — winws MTProto profiles still apply */
+        }
+    }
+
+    private static string? FindTelegramExe()
+    {
+        foreach (var p in Process.GetProcessesByName("Telegram"))
+        {
+            try
+            {
+                string? path = p.MainModule?.FileName;
+                if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                    return path;
+            }
+            catch { /* access denied for elevated Telegram, etc. */ }
+            finally
+            {
+                p.Dispose();
+            }
+        }
+
+        string[] candidates =
+        [
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Telegram Desktop", "Telegram.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Telegram Desktop", "Telegram.exe"),
+            @"C:\Program Files\Telegram Desktop\Telegram.exe",
+            @"C:\Program Files (x86)\Telegram Desktop\Telegram.exe",
+        ];
+
+        foreach (var path in candidates)
+            if (File.Exists(path)) return path;
+
+        return null;
     }
 
     private void WritePortableConfig()
@@ -152,22 +252,9 @@ public sealed class TgWsProxyService : IDisposable
         return false;
     }
 
-    private void TryOpenTelegramProxy()
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(ProxyDeeplink) { UseShellExecute = true });
-            Emit("Если Telegram не открылся — вставьте ссылку из лога в браузер или настройте прокси вручную.");
-        }
-        catch (Exception ex)
-        {
-            Emit($"Не удалось открыть tg:// ссылку: {ex.Message}");
-            Emit($"Скопируйте в браузер: {ProxyDeeplink}");
-        }
-    }
-
     public void Stop()
     {
+        StopDesktopWatch();
         if (_proc is null) return;
         try
         {
@@ -181,8 +268,6 @@ public sealed class TgWsProxyService : IDisposable
             _proc = null;
         }
     }
-
-    private void Emit(string line) => LogLine?.Invoke(line);
 
     public void Dispose() => Stop();
 }
