@@ -318,13 +318,14 @@ public sealed class PresetService
         Next();
         a.AddRange(new[]
         {
-            "--filter-tcp=80,443,5222",
+            "--filter-tcp=1-65535",
             "{IPSET:telegram}",
             "{IPSET:telegram-bypass}",
             "--payload=all",
             "--out-range=-n8",
             "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=tls_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20",
+            "--lua-desync=fake:blob=tls_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=4",
             "--lua-desync=pass",
         });
 

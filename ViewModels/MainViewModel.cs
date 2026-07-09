@@ -46,9 +46,9 @@ public sealed class MainViewModel : ObservableObject
         _telegramHosts.LogLine += line => OnUi(() => AppendLog(line));
         _discordHosts.LogLine += line => OnUi(() => AppendLog(line));
 
-        StartCommand = new RelayCommand(_ => Start(), _ => CanStart);
+        StartCommand = new RelayCommand(async _ => await StartAsync(), _ => CanStart);
         StopCommand = new RelayCommand(_ => _engine.Stop(), _ => CanStop);
-        ToggleCommand = new RelayCommand(_ => { if (IsRunning) _engine.Stop(); else Start(); },
+        ToggleCommand = new RelayCommand(async _ => { if (IsRunning) _engine.Stop(); else await StartAsync(); },
                                          _ => !IsUpdating && (IsRunning || CanStart));
         CheckUpdateCommand = new RelayCommand(async _ => await CheckAndUpdateAsync(silent: false),
                                               _ => !IsUpdating);
@@ -65,7 +65,7 @@ public sealed class MainViewModel : ObservableObject
         ApplyStrategyCommand = new RelayCommand(async _ => await ApplyStrategyAsync(),
                                                 _ => IsStrategyChangePending && !IsUpdating);
 
-        SimpleToggleCommand = new RelayCommand(_ => SimpleToggle(),
+        SimpleToggleCommand = new RelayCommand(async _ => await SimpleToggleAsync(),
             _ => !IsUpdating && (IsRunning || CanStart));
 
         SetSimpleModeCommand = new RelayCommand(_ => IsSimpleMode = true);
@@ -410,7 +410,7 @@ public sealed class MainViewModel : ObservableObject
         {
             await _engine.StopAsync(TimeSpan.FromSeconds(3));
         }
-        if (CanStart) Start();
+        if (CanStart) await StartAsync();
         if (IsRunning)
             Notify?.Invoke("Zapret UI", "Обход перезапущен автоматически.");
     }
@@ -449,7 +449,7 @@ public sealed class MainViewModel : ObservableObject
     private string _simpleStatus = "Нажмите «Включить обход» — приложение применит рекомендуемый набор и запустит DPI-обход.";
     public string SimpleStatus { get => _simpleStatus; private set => SetField(ref _simpleStatus, value); }
 
-    private void SimpleToggle()
+    private async Task SimpleToggleAsync()
     {
         if (IsRunning) { _engine.Stop(); SimpleStatus = "Обход остановлен."; return; }
 
@@ -457,7 +457,7 @@ public sealed class MainViewModel : ObservableObject
         if (preset is null) { SimpleStatus = "Движок ещё не установлен — дождитесь загрузки."; return; }
         SelectedPreset = preset;
         SimpleStatus = $"Запускаю обход: «{preset.Name}».";
-        Start();
+        await StartAsync();
     }
 
     // ---- auto-heal ---------------------------------------------------------
@@ -513,7 +513,7 @@ public sealed class MainViewModel : ObservableObject
         ShowChangelogIfUpdated();
 
         if (Settings.AutostartEngine && CanStart && SelectedPreset is not null)
-            Start();
+            await StartAsync();
     }
 
     private void ShowChangelogIfUpdated()
@@ -547,14 +547,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Telegram Desktop — автоподключение
-Программа сама подхватывает Telegram на ПК: тихий мост + автоприменение, без ручной настройки прокси.
+        return @"✦ Telegram Desktop — автоподключение v2
+Мост запускается до winws, прокси применяется несколько раз, диалог «Подключить» нажимается сам.
 
-✦ MTProto обход DC
-Профили Telegram Desktop теперь первые в цепочке (send + fake + fakedsplit).
+✦ MTProto все порты
+Профиль DC ловит любой TCP на ipset Telegram (не только 443).
 
 ✦ Веб-Telegram
-Без изменений — hostfakesplit + hosts.";
+Без изменений.";
     }
 
     private void AutoImportClassicPresets(bool force = false)
@@ -671,7 +671,7 @@ public sealed class MainViewModel : ObservableObject
                         OnPropertyChanged(nameof(CanStart));
                         RaiseCommandStates();
 
-                        if (wasRunning && CanStart) Start();
+                        if (wasRunning && CanStart) await StartAsync();
                     }
                 }
                 else
@@ -754,7 +754,7 @@ public sealed class MainViewModel : ObservableObject
 
     // ---- actions -----------------------------------------------------------
 
-    private void Start()
+    private async Task StartAsync()
     {
         if (SelectedPreset is null)
         {
@@ -768,10 +768,17 @@ public sealed class MainViewModel : ObservableObject
             if (Settings.TelegramWebHosts && PresetHasService(SelectedPreset, "Telegram"))
                 _telegramHosts.Apply();
 
+            // Telegram Desktop bridge before winws — same path as web (WS tunnel to DC).
+            if (Settings.TelegramWsProxy && PresetHasService(SelectedPreset, "Telegram"))
+            {
+                if (!string.IsNullOrWhiteSpace(Settings.TelegramWsProxySecret))
+                    _tgWs.Secret = Settings.TelegramWsProxySecret.Trim();
+                try { await _tgWs.StartAsync(); }
+                catch (Exception ex) { AppendLog($"Telegram Desktop: {ex.Message}"); }
+            }
+
             _engine.Start(SelectedPreset, SelectedPreset.UsesHostlist ? null : null);
             RunningPreset = SelectedPreset;
-            if (_engine.IsRunning && Settings.TelegramWsProxy && PresetHasService(SelectedPreset, "Telegram"))
-                _ = StartTelegramProxyAsync();
         }
         catch (Exception ex)
         {
@@ -783,29 +790,15 @@ public sealed class MainViewModel : ObservableObject
     private static bool PresetHasService(Preset preset, string service) =>
         preset.Name.Contains(service, StringComparison.OrdinalIgnoreCase);
 
-    private async Task StartTelegramProxyAsync()
-    {
-        try
-        {
-            if (!string.IsNullOrWhiteSpace(Settings.TelegramWsProxySecret))
-                _tgWs.Secret = Settings.TelegramWsProxySecret.Trim();
-            await _tgWs.StartAsync();
-        }
-        catch
-        {
-            /* silent — winws MTProto profiles still work */
-        }
-    }
-
     private async Task ApplyStrategyAsync()
     {
         if (SelectedPreset is null) return;
-        if (!IsRunning) { if (CanStart) Start(); return; }
+        if (!IsRunning) { if (CanStart) await StartAsync(); return; }
 
         AppendLog($"Смена стратегии -> «{SelectedPreset.Name}». Перезапуск движка…");
         await _engine.StopAsync(TimeSpan.FromSeconds(3));
         await Task.Delay(250);
-        if (CanStart) Start();
+        if (CanStart) await StartAsync();
     }
 
     private void DuplicatePreset()
