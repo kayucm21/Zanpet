@@ -9,6 +9,24 @@ public partial class App : Application
 {
     protected override void OnStartup(StartupEventArgs e)
     {
+        if (!AdminElevation.IsRunningAsAdmin())
+        {
+            if (AdminElevation.TryRelaunchElevated())
+            {
+                Shutdown(0);
+                return;
+            }
+
+            MessageBox.Show(
+                "Zapret UI нужно запускать от имени администратора (WinDivert).\n\n" +
+                "Подтвердите запрос UAC или запустите exe правой кнопкой → «Запуск от имени администратора».",
+                "Требуются права администратора",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            Shutdown(1);
+            return;
+        }
+
         base.OnStartup(e);
 
         DispatcherUnhandledException += OnDispatcherUnhandledException;

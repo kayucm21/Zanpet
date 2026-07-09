@@ -7,7 +7,7 @@ namespace ZapretUI.Services;
 public sealed class AppSettings
 {
     /// <summary>Schema version for future migrations. Bump when adding/removing fields.</summary>
-    public int SettingsVersion { get; set; } = 1;
+    public int SettingsVersion { get; set; } = 4;
 
     public string? ActivePresetName { get; set; }
     public string? ActiveHostlist { get; set; }
@@ -37,17 +37,17 @@ public sealed class AppSettings
     /// <summary>Theme mode: "dark" (default) or "light".</summary>
     public string Theme { get; set; } = "dark";
 
-    /// <summary>Auto-connect Telegram Desktop (silent MTProto bridge, no manual proxy setup).</summary>
+    /// <summary>Silent MTProto bridge for Telegram Desktop (tg-ws-proxy, no browser).</summary>
     public bool TelegramWsProxy { get; set; } = true;
 
     /// <summary>Write Windows hosts entries for discord.com (Cloudflare edge pin).</summary>
     public bool DiscordWebHosts { get; set; } = true;
 
-    /// <summary>Write Windows hosts entries for web.telegram.org (Flowseal community fix).</summary>
+    /// <summary>Write Windows hosts for Telegram web + desktop (DC pin, like Discord hosts).</summary>
     public bool TelegramWebHosts { get; set; } = true;
 
-    /// <summary>Fixed MTProto secret for tg-ws-proxy (32 hex chars).</summary>
-    public string TelegramWsProxySecret { get; set; } = "eecb9b9a39b6f0d6e8c4a2b1f0d3e7a";
+    /// <summary>Fixed MTProto secret for tg-ws-proxy (exactly 32 hex chars).</summary>
+    public string TelegramWsProxySecret { get; set; } = "eecb9b9a39b6f0d6e8c4a2b1f0d3e7a0";
 
     /// <summary>Last app version the user saw the changelog for. Empty = never shown.</summary>
     public string LastSeenVersion { get; set; } = "";
@@ -57,6 +57,22 @@ public sealed class AppSettings
     {
         // Clamp version to known range for forward-compatible migrations.
         if (SettingsVersion < 1) SettingsVersion = 1;
+        if (SettingsVersion < 2)
+            SettingsVersion = 2;
+        if (SettingsVersion < 3)
+        {
+            TelegramWsProxy = true;
+            SettingsVersion = 3;
+        }
+        if (SettingsVersion < 4)
+        {
+            // v2.7.4: MTProto secret must be 32 hex chars (was 31 — bridge crashed).
+            if (string.IsNullOrWhiteSpace(TelegramWsProxySecret)
+                || TelegramWsProxySecret.Trim().Length != 32
+                || !TelegramWsProxySecret.Trim().All(Uri.IsHexDigit))
+                TelegramWsProxySecret = "eecb9b9a39b6f0d6e8c4a2b1f0d3e7a0";
+            SettingsVersion = 4;
+        }
         return this;
     }
 }

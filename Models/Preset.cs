@@ -47,4 +47,27 @@ public sealed class Preset
         IsGenerated = IsGenerated,
         IsBuiltIn = false
     };
+
+    /// <summary>Whether this preset's winws args target a service (not just the preset name).</summary>
+    public bool IncludesService(string service)
+    {
+        if (Name.Contains(service, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        string key = service.ToLowerInvariant();
+        foreach (var a in Args)
+        {
+            if (a.Contains($"{{HOSTLIST:{key}}}", StringComparison.OrdinalIgnoreCase)
+                || a.Contains($"{{IPSET:{key}}}", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (key == "telegram" && a.Contains("telegram.org", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (key == "discord" && a.Contains("discord.gg", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (key == "youtube" && a.Contains("googlevideo.com", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
 }

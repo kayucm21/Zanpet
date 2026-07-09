@@ -5,32 +5,36 @@ using System.Text;
 namespace ZapretUI.Services;
 
 /// <summary>
-/// Temporary Windows hosts entries for Telegram Web (web.telegram.org).
-/// Russian ISPs often poison DNS for Telegram; redirecting web domains to a working DC IP
-/// is a proven Flowseal community fix (see zapret-discord-youtube issues #5956, #11409).
+/// Temporary Windows hosts for Telegram (web + desktop) — same approach as Discord hosts.
+/// Pins poisoned DNS to working DC IPs so winws TLS bypass can reach the servers.
 /// </summary>
 public sealed class TelegramHostsService
 {
     private const string BeginMarker = "# BEGIN ZAPRETUI TELEGRAM";
     private const string EndMarker = "# END ZAPRETUI TELEGRAM";
 
-    /// <summary>Amsterdam DC — commonly used for web.telegram.org WS endpoints.</summary>
-    private const string WebDcIp = "149.154.167.220";
-
-    private static readonly string[] WebDomains =
-    {
-        "web.telegram.org", "pluto.web.telegram.org",
-        "zws1.web.telegram.org", "zws2.web.telegram.org", "zws2-1.web.telegram.org",
-        "zws3.web.telegram.org", "zws4.web.telegram.org", "zws4-1.web.telegram.org",
-        "zws5.web.telegram.org",
-        "kws2.web.telegram.org", "kws2-1.web.telegram.org",
-        "kws4.web.telegram.org", "kws4-1.web.telegram.org",
-        "venus.web.telegram.org", "venus-1.web.telegram.org",
-        "vesta.web.telegram.org", "vesta-1.web.telegram.org",
-        "api.telegram.org", "td.telegram.org", "cdn.telegram.org",
-        "telegram.org", "t.me", "telegram.me", "telegram.dog",
-        "telegram.space", "telesco.pe", "tg.dev",
-    };
+    private static readonly (string Ip, string[] Domains)[] Entries =
+    [
+        ("149.154.167.220", new[]
+        {
+            "web.telegram.org", "pluto.web.telegram.org",
+            "zws1.web.telegram.org", "zws2.web.telegram.org", "zws2-1.web.telegram.org",
+            "zws3.web.telegram.org", "zws4.web.telegram.org", "zws4-1.web.telegram.org",
+            "zws5.web.telegram.org",
+            "kws2.web.telegram.org", "kws2-1.web.telegram.org",
+            "kws4.web.telegram.org", "kws4-1.web.telegram.org",
+            "api.telegram.org", "td.telegram.org", "cdn.telegram.org", "k.telegram.org",
+            "core.telegram.org",
+            "telegram.org", "www.telegram.org", "t.me", "telegram.me", "telegram.dog",
+            "telegram.space", "telesco.pe", "tg.dev", "tx.me", "teleg.xyz",
+            "telegra.ph", "graph.org", "tdesktop.com", "telegramusercontent.com",
+        }),
+        ("149.154.175.50", new[]
+        {
+            "venus.web.telegram.org", "venus-1.web.telegram.org",
+            "vesta.web.telegram.org", "vesta-1.web.telegram.org",
+        }),
+    ];
 
     private static string HostsPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"drivers\etc\hosts");
@@ -49,18 +53,25 @@ public sealed class TelegramHostsService
             var block = new StringBuilder();
             block.AppendLine();
             block.AppendLine(BeginMarker);
-            foreach (var d in WebDomains)
-                block.AppendLine($"{WebDcIp} {d}");
+            int count = 0;
+            foreach (var (ip, domains) in Entries)
+            {
+                foreach (var d in domains)
+                {
+                    block.AppendLine($"{ip} {d}");
+                    count++;
+                }
+            }
             block.AppendLine(EndMarker);
             File.WriteAllText(HostsPath, text.TrimEnd() + block.ToString());
             FlushDns();
             IsApplied = true;
-            Emit($"Telegram Web: hosts → {WebDcIp} ({WebDomains.Length} доменов)");
+            Emit($"Telegram: hosts ({count} доменов, как Discord)");
             return true;
         }
         catch (Exception ex)
         {
-            Emit($"Telegram Web hosts: {ex.Message} (запустите от администратора)");
+            Emit($"Telegram hosts: {ex.Message} (запустите от администратора)");
             return false;
         }
     }
@@ -79,7 +90,7 @@ public sealed class TelegramHostsService
         }
         catch (Exception ex)
         {
-            Emit($"Telegram Web hosts (удаление): {ex.Message}");
+            Emit($"Telegram hosts (удаление): {ex.Message}");
         }
         finally
         {

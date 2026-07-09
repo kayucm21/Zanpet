@@ -349,7 +349,7 @@ public sealed class EngineService : IDisposable
             if (!File.Exists(AppPaths.WinwsExe))
                 throw new FileNotFoundException("winws2.exe не найден. Дождитесь загрузки движка.");
 
-            if (!IsAdministrator())
+            if (!AdminElevation.IsRunningAsAdmin())
                 Emit("=== ВНИМАНИЕ: приложение запущено НЕ от Администратора. WinDivert-драйвер не установится. ===");
 
             SetState(EngineState.Starting);
@@ -592,16 +592,7 @@ public sealed class EngineService : IDisposable
         catch { /* best-effort; graceful Stop() still handles a clean exit */ }
     }
 
-    private static bool IsAdministrator()
-    {
-        try
-        {
-            using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
-            var principal = new System.Security.Principal.WindowsPrincipal(identity);
-            return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
-        }
-        catch { return false; }
-    }
+    private static bool IsAdministrator() => AdminElevation.IsRunningAsAdmin();
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string? lpName);

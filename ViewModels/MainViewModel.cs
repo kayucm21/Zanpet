@@ -547,14 +547,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Telegram Desktop — автоподключение v2
-Мост запускается до winws, прокси применяется несколько раз, диалог «Подключить» нажимается сам.
+        return @"✦ Telegram Desktop — автомост
+Тихий мост MTProto→WebSocket (как веб-Telegram). Прокси включается сам, браузер не открывается.
 
-✦ MTProto все порты
-Профиль DC ловит любой TCP на ipset Telegram (не только 443).
+✦ MTProto DC
+Профили ipset для прямых подключений к дата-центрам.
 
-✦ Веб-Telegram
-Без изменений.";
+✦ Hosts + TLS
+Как Discord — hosts и tls_multisplit для доменов Telegram.";
     }
 
     private void AutoImportClassicPresets(bool force = false)
@@ -768,17 +768,21 @@ public sealed class MainViewModel : ObservableObject
             if (Settings.TelegramWebHosts && PresetHasService(SelectedPreset, "Telegram"))
                 _telegramHosts.Apply();
 
-            // Telegram Desktop bridge before winws — same path as web (WS tunnel to DC).
+            _engine.Start(SelectedPreset, SelectedPreset.UsesHostlist ? null : null);
+            RunningPreset = SelectedPreset;
+
+            // Desktop bridge AFTER winws — tunnel uses web.telegram.org (needs bypass first).
             if (Settings.TelegramWsProxy && PresetHasService(SelectedPreset, "Telegram"))
             {
                 if (!string.IsNullOrWhiteSpace(Settings.TelegramWsProxySecret))
                     _tgWs.Secret = Settings.TelegramWsProxySecret.Trim();
-                try { await _tgWs.StartAsync(); }
+                try
+                {
+                    await Task.Delay(1500);
+                    await _tgWs.StartAsync();
+                }
                 catch (Exception ex) { AppendLog($"Telegram Desktop: {ex.Message}"); }
             }
-
-            _engine.Start(SelectedPreset, SelectedPreset.UsesHostlist ? null : null);
-            RunningPreset = SelectedPreset;
         }
         catch (Exception ex)
         {
@@ -788,7 +792,7 @@ public sealed class MainViewModel : ObservableObject
     }
 
     private static bool PresetHasService(Preset preset, string service) =>
-        preset.Name.Contains(service, StringComparison.OrdinalIgnoreCase);
+        preset.IncludesService(service);
 
     private async Task ApplyStrategyAsync()
     {

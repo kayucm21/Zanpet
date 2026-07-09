@@ -7,8 +7,9 @@ using System.Text.Json;
 namespace ZapretUI.Services;
 
 /// <summary>
-/// Local MTProto→WebSocket bridge for Telegram Desktop. Applies proxy automatically
-/// (including the native confirm dialog) — no manual settings.
+/// Silent MTProto→WebSocket bridge for Telegram Desktop. Web Telegram works because traffic
+/// goes through web.telegram.org; desktop uses raw DC IPs which ISPs often block. This tunnel
+/// routes desktop through the same web path — proxy is applied automatically (no browser).
 /// </summary>
 public sealed class TgWsProxyService : IDisposable
 {
@@ -22,14 +23,17 @@ public sealed class TgWsProxyService : IDisposable
         "https://sourceforge.net/projects/tg-ws-proxy.mirror/files/v1.8.1/TgWsProxy_windows.exe/download";
 
     private static readonly HttpClient Http = HttpFactory.General;
-    private static readonly int[] ApplyDelaysMs = [0, 1500, 4000, 9000, 18000];
+    private static readonly int[] ApplyDelaysMs = [0, 2000];
 
     private Process? _proc;
-    private CancellationTokenSource? _watchCts;
     private CancellationTokenSource? _clickerCts;
-    private DateTime _lastApplyUtc;
+    private bool _proxyAppliedThisSession;
+    private bool _deeplinkSent;
+    private string? _loggedTelegramPath;
 
-    public string Secret { get; set; } = "eecb9b9a39b6f0d6e8c4a2b1f0d3e7a";
+    private const string DefaultSecret = "eecb9b9a39b6f0d6e8c4a2b1f0d3e7a0";
+
+    public string Secret { get; set; } = DefaultSecret;
 
     public bool IsRunning => _proc is { HasExited: false };
 
@@ -42,9 +46,6 @@ public sealed class TgWsProxyService : IDisposable
 
     private string ProxyDeeplink =>
         $"tg://proxy?server={DefaultHost}&port={DefaultPort}&secret=dd{Secret}";
-
-    private string ProxyHttpsLink =>
-        $"https://t.me/proxy?server={DefaultHost}&port={DefaultPort}&secret=dd{Secret}";
 
     public async Task EnsureInstalledAsync(CancellationToken ct = default)
     {
@@ -79,11 +80,16 @@ public sealed class TgWsProxyService : IDisposable
     {
         if (IsRunning)
         {
-            await ApplyProxyWithRetriesAsync(ct).ConfigureAwait(false);
+            if (!_proxyAppliedThisSession)
+                await ApplyProxyOnceAsync(ct).ConfigureAwait(false);
             return;
         }
 
+        _proxyAppliedThisSession = false;
+        _deeplinkSent = false;
         await EnsureInstalledAsync(ct).ConfigureAwait(false);
+        Secret = NormalizeSecret(Secret);
+        KillStaleProcesses();
         WritePortableConfig();
 
         var psi = new ProcessStartInfo
@@ -99,28 +105,35 @@ public sealed class TgWsProxyService : IDisposable
         _proc = Process.Start(psi)
             ?? throw new InvalidOperationException("Не удалось запустить компонент Telegram Desktop.");
 
-        if (!await WaitForListenAsync(DefaultHost, DefaultPort, TimeSpan.FromSeconds(15), ct).ConfigureAwait(false))
+        if (!await WaitForListenAsync(DefaultHost, DefaultPort, TimeSpan.FromSeconds(45), ct).ConfigureAwait(false))
         {
             int code = _proc is { HasExited: true } p ? p.ExitCode : -1;
+            string logHint = ReadProxyLogTail();
             throw new InvalidOperationException(
                 code >= 0
-                    ? $"Компонент Telegram Desktop завершился (код {code})."
-                    : "Компонент Telegram Desktop не запустился.");
+                    ? $"Мост Telegram завершился (код {code}).{logHint}"
+                    : $"Мост Telegram не запустился.{logHint}");
         }
 
-        await ApplyProxyWithRetriesAsync(ct).ConfigureAwait(false);
-        StartDesktopWatch(ct);
+        Emit($"Telegram Desktop: мост {DefaultHost}:{DefaultPort}");
+        await ApplyProxyOnceAsync(ct).ConfigureAwait(false);
     }
 
-    private async Task ApplyProxyWithRetriesAsync(CancellationToken ct)
+    private async Task ApplyProxyOnceAsync(CancellationToken ct)
     {
+        if (_proxyAppliedThisSession) return;
+
         StartDialogAutoClicker(ct);
         foreach (int delay in ApplyDelaysMs)
         {
             if (delay > 0)
                 await Task.Delay(delay, ct).ConfigureAwait(false);
-            ApplyProxyToDesktop();
+            if (TryApplyProxyToDesktop())
+                break;
         }
+
+        _proxyAppliedThisSession = true;
+        StopDialogAutoClicker();
     }
 
     private void StartDialogAutoClicker(CancellationToken outerCt)
@@ -128,7 +141,64 @@ public sealed class TgWsProxyService : IDisposable
         StopDialogAutoClicker();
         _clickerCts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
         var token = _clickerCts.Token;
-        _ = Task.Run(() => TelegramProxyUiHelper.RunFor(TimeSpan.FromSeconds(60), token), token);
+        _ = Task.Run(() => TelegramProxyUiHelper.RunFor(TimeSpan.FromSeconds(12), token), token);
+    }
+
+    /// <returns>True when proxy deeplink was sent or Telegram is already running (clicker handles dialog).</returns>
+    private bool TryApplyProxyToDesktop()
+    {
+        var located = TelegramLocator.Locate();
+
+        if (located.ExePath is not null)
+        {
+            if (_loggedTelegramPath != located.ExePath)
+            {
+                _loggedTelegramPath = located.ExePath;
+                Emit($"Telegram Desktop: найден — {located.ExePath}");
+            }
+        }
+        else if (located.ProcessRunning)
+        {
+            Emit($"Telegram Desktop: процесс запущен ({located.ProcessCount} шт.), автоподключение прокси…");
+            TelegramProxyUiHelper.TryClickOnce();
+            return true;
+        }
+        else
+        {
+            Emit("Telegram Desktop: не найден — запустите Telegram вручную");
+            return false;
+        }
+
+        bool wasRunning = located.ProcessRunning;
+        if (_deeplinkSent)
+        {
+            TelegramProxyUiHelper.TryClickOnce();
+            return true;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = located.ExePath,
+                Arguments = $"-- \"{ProxyDeeplink}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            _deeplinkSent = true;
+
+            if (!wasRunning)
+                Emit("Telegram Desktop: запуск с автопрокси");
+            else
+                Emit("Telegram Desktop: прокси применён (один раз за сессию)");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Emit($"Telegram Desktop: {ex.Message}");
+            return false;
+        }
     }
 
     private void StopDialogAutoClicker()
@@ -136,98 +206,6 @@ public sealed class TgWsProxyService : IDisposable
         try { _clickerCts?.Cancel(); } catch { }
         _clickerCts?.Dispose();
         _clickerCts = null;
-    }
-
-    private void StartDesktopWatch(CancellationToken outerCt)
-    {
-        StopDesktopWatch();
-        _watchCts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
-        var token = _watchCts.Token;
-        _ = Task.Run(async () =>
-        {
-            while (!token.IsCancellationRequested)
-            {
-                try
-                {
-                    if (IsRunning && Process.GetProcessesByName("Telegram").Length > 0)
-                    {
-                        // Re-apply every 20s while Telegram is open (welcome screen keeps retrying).
-                        if (DateTime.UtcNow - _lastApplyUtc > TimeSpan.FromSeconds(20))
-                            ApplyProxyToDesktop();
-                    }
-                    await Task.Delay(3000, token).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) { break; }
-                catch { /* best-effort */ }
-            }
-        }, token);
-    }
-
-    private void StopDesktopWatch()
-    {
-        try { _watchCts?.Cancel(); } catch { }
-        _watchCts?.Dispose();
-        _watchCts = null;
-    }
-
-    private void ApplyProxyToDesktop()
-    {
-        _lastApplyUtc = DateTime.UtcNow;
-        string? telegramExe = FindTelegramExe();
-
-        try
-        {
-            if (telegramExe is not null)
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = telegramExe,
-                    Arguments = $"-- \"{ProxyDeeplink}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                });
-            }
-        }
-        catch { /* fall through */ }
-
-        try
-        {
-            Process.Start(new ProcessStartInfo(ProxyHttpsLink) { UseShellExecute = true });
-        }
-        catch { /* best-effort */ }
-    }
-
-    private static string? FindTelegramExe()
-    {
-        foreach (var p in Process.GetProcessesByName("Telegram"))
-        {
-            try
-            {
-                string? path = p.MainModule?.FileName;
-                if (!string.IsNullOrEmpty(path) && File.Exists(path))
-                    return path;
-            }
-            catch { /* elevated / access */ }
-            finally
-            {
-                p.Dispose();
-            }
-        }
-
-        string[] candidates =
-        [
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Telegram Desktop", "Telegram.exe"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Telegram Desktop", "Telegram.exe"),
-            @"C:\Program Files\Telegram Desktop\Telegram.exe",
-            @"C:\Program Files (x86)\Telegram Desktop\Telegram.exe",
-        ];
-
-        foreach (var path in candidates)
-            if (File.Exists(path)) return path;
-
-        return null;
     }
 
     private void WritePortableConfig()
@@ -252,6 +230,45 @@ public sealed class TgWsProxyService : IDisposable
             ["language"] = "ru",
         };
         File.WriteAllText(ConfigPath, JsonSerializer.Serialize(cfg, new JsonSerializerOptions { WriteIndented = true }));
+        // Skip first-run / IPv6 GUI dialogs that block headless start.
+        File.WriteAllText(Path.Combine(PortableDataDir, ".first_run_done_mtproto"), "");
+        File.WriteAllText(Path.Combine(PortableDataDir, ".ipv6_warned"), "");
+    }
+
+    private static void KillStaleProcesses()
+    {
+        foreach (var p in Process.GetProcessesByName("TgWsProxy"))
+        {
+            try
+            {
+                if (!p.HasExited)
+                    p.Kill(entireProcessTree: true);
+            }
+            catch { /* best-effort */ }
+            finally { p.Dispose(); }
+        }
+    }
+
+    private static string NormalizeSecret(string? secret)
+    {
+        string s = (secret ?? "").Trim().ToLowerInvariant();
+        if (s.Length == 32 && s.All(static c => Uri.IsHexDigit(c)))
+            return s;
+        return DefaultSecret;
+    }
+
+    private static string ReadProxyLogTail()
+    {
+        try
+        {
+            string logPath = Path.Combine(PortableDataDir, "proxy.log");
+            if (!File.Exists(logPath)) return "";
+            var lines = File.ReadAllLines(logPath);
+            if (lines.Length == 0) return "";
+            string last = lines[^1];
+            return string.IsNullOrWhiteSpace(last) ? "" : $" ({last})";
+        }
+        catch { return ""; }
     }
 
     private static async Task<bool> WaitForListenAsync(
@@ -277,8 +294,9 @@ public sealed class TgWsProxyService : IDisposable
 
     public void Stop()
     {
-        StopDesktopWatch();
         StopDialogAutoClicker();
+        _proxyAppliedThisSession = false;
+        _deeplinkSent = false;
         if (_proc is null) return;
         try
         {
@@ -294,4 +312,6 @@ public sealed class TgWsProxyService : IDisposable
     }
 
     public void Dispose() => Stop();
+
+    private void Emit(string line) => LogLine?.Invoke(line);
 }

@@ -114,25 +114,25 @@ public sealed class PresetService
         ),
         Combo(
             name: "Multidisorder Advanced",
-            description: "Продвинутый multidisorder с multisplit по нескольким позициям. Использует seqovl для дополнительного искажения. Для агрессивных DPI.",
+            description: "YouTube, Discord, Telegram + продвинутый multidisorder/multisplit для остального TLS. Для агрессивных DPI.",
             recommended: false,
             buildArgs: BuildMultidisorderArgs
         ),
         Combo(
             name: "FakeSplit Pro",
-            description: "fakedsplit + fakeddisorder: отправка поддельных сегментов перед реальными. Двойное искажение для максимального обхода DPI.",
+            description: "YouTube, Discord, Telegram + fakedsplit/fakeddisorder для остального TLS. Двойное искажение пакетов.",
             recommended: false,
             buildArgs: BuildFakeSplitArgs
         ),
         Combo(
             name: "TCP Segmentation",
-            description: "tcpseg: агрессивная сегментация TCP через seqovl. Разбивает пакет на мелкие куски с наложением. Для DPI, не разбирающих сегментацию.",
+            description: "YouTube, Discord, Telegram + tcpseg для остального TLS. Сегментация с seqovl.",
             recommended: false,
             buildArgs: BuildTcpSegArgs
         ),
         Combo(
             name: "OOB Injection",
-            description: "Out-of-band injection: внедрение байта OOB в TCP поток с URG-флагом. Сбивает DPI, который не обрабатывает экстренные данные.",
+            description: "YouTube, Discord, Telegram + OOB injection для остального TLS. URG-флаг в потоке.",
             recommended: false,
             buildArgs: BuildOobArgs
         ),
@@ -306,7 +306,7 @@ public sealed class PresetService
         });
     }
 
-    /// <summary>Telegram Desktop MTProto to DC IPs — highest priority, no seqovl.</summary>
+    /// <summary>Telegram Desktop — Discord-style hosts + tls_multisplit, then MTProto ipset.</summary>
     private static void AppendTelegramDesktopProfiles(List<string> a, bool firstSegment)
     {
         void Next()
@@ -315,6 +315,53 @@ public sealed class PresetService
             firstSegment = false;
         }
 
+        // Desktop gateway (venus/vesta) — same tls_multisplit as Discord gateway.
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "--hostlist-domains=venus.web.telegram.org,vesta.web.telegram.org,venus-1.web.telegram.org,vesta-1.web.telegram.org",
+            "--payload=all",
+            "--out-range=-d2",
+        });
+        a.AddRange(FastTlsDiscordOnly);
+
+        // Full telegram hostlist — instant TLS bypass on first packet (like Discord).
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,5222",
+            "{HOSTLIST:telegram}",
+            "--payload=all",
+            "--out-range=-d2",
+        });
+        a.AddRange(FastTlsDiscordOnly);
+
+        // WS/CDN (desktop media).
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "--hostlist-domains=zws1.web.telegram.org,zws2.web.telegram.org,zws3.web.telegram.org,zws4.web.telegram.org,zws5.web.telegram.org,pluto.web.telegram.org",
+            "--payload=all",
+            "--out-range=-d2",
+        });
+        a.AddRange(FastTlsDiscordOnly);
+
+        // MTProto to DC IPs — classic send+syndata+pass (Default v4).
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,5222",
+            "{IPSET:telegram}",
+            "--payload=all",
+            "--out-range=-n8",
+            "--lua-desync=send:repeats=2",
+            "--lua-desync=syndata:blob=tls_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20",
+            "--lua-desync=pass",
+        });
+
+        // MTProto to DC IPs — extended fakedsplit/fake.
         Next();
         a.AddRange(new[]
         {
