@@ -151,20 +151,26 @@ public sealed class UpdaterService
     /// <summary>Fetch the zip download URL for a specific app release tag.</summary>
     public async Task<string?> FetchAppZipUrlAsync(string tag, CancellationToken ct = default)
     {
-        try
+        string bare = tag.TrimStart('v');
+        foreach (string tagName in new[] { $"v{bare}", bare })
         {
-            string apiUrl = $"https://api.github.com/repos/kayucm21/Zanpet/releases/tags/{tag}";
-            using var resp = await Http.GetAsync(apiUrl, ct).ConfigureAwait(false);
-            resp.EnsureSuccessStatusCode();
-            using var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false), cancellationToken: ct).ConfigureAwait(false);
-            foreach (var asset in doc.RootElement.GetProperty("assets").EnumerateArray())
+            try
             {
-                string name = asset.GetProperty("name").GetString() ?? "";
-                if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-                    return asset.GetProperty("browser_download_url").GetString();
+                string apiUrl = $"https://api.github.com/repos/kayucm21/Zanpet/releases/tags/{tagName}";
+                using var resp = await Http.GetAsync(apiUrl, ct).ConfigureAwait(false);
+                if (!resp.IsSuccessStatusCode) continue;
+                using var doc = await JsonDocument.ParseAsync(
+                    await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false),
+                    cancellationToken: ct).ConfigureAwait(false);
+                foreach (var asset in doc.RootElement.GetProperty("assets").EnumerateArray())
+                {
+                    string name = asset.GetProperty("name").GetString() ?? "";
+                    if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                        return asset.GetProperty("browser_download_url").GetString();
+                }
             }
+            catch { /* try next tag format */ }
         }
-        catch { }
         return null;
     }
 
@@ -227,10 +233,9 @@ public sealed class UpdaterService
         IProgress<double>? progress = null,
         CancellationToken ct = default)
     {
-        WriteCooldown();
         string tag = release.Tag.TrimStart('v');
         string zipPath = Path.Combine(Path.GetTempPath(), $"ZapretUI-{tag}.zip");
-        string stageDir = Path.Combine(Path.GetTempPath(), $"ZapretUI-stage-{Guid.NewGuid():N}");
+        string stageDir = Path.Combine(Path.GetTempPath(), $"ZapretUI-stage-{tag}");
 
         try
         {
@@ -293,90 +298,22 @@ public sealed class UpdaterService
             if (!downloaded)
                 throw lastError ?? new InvalidOperationException("Не удалось скачать обновление.");
 
-            Directory.CreateDirectory(stageDir);
+            progress?.Report(1);
+            AppUpdateInstaller.ExtractZip(zipPath, stageDir);
 
-            using (var zipStream = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read))
-            using (var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read))
-            {
-                foreach (var entry in archive.Entries)
-                {
-                    if (string.IsNullOrEmpty(entry.Name)) continue;
-                    string dest = Path.Combine(stageDir, entry.FullName);
-                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                    using var src = entry.Open();
-                    using var dst = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None);
-                    src.CopyTo(dst);
-                }
-            }
+            string installDir = AppUpdateInstaller.GetInstallDirectory();
+            WriteCooldown();
+            AppUpdateInstaller.LaunchUpdateBatch(stageDir, installDir, tag, Environment.ProcessId);
 
-            string exeDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
-            string batPath = Path.Combine(Path.GetTempPath(), "ZapretUI-update.bat");
-            string selfExe = Environment.ProcessPath ?? Path.Combine(exeDir, "ZapretUI.exe");
-            string exeName = Path.GetFileName(selfExe);
-            string logPath = Path.Combine(Path.GetTempPath(), "ZapretUI-update.log");
-            string oldExe = Path.Combine(exeDir, "ZapretUI_old.exe");
+            try { File.Delete(zipPath); } catch { }
 
-            var bat = new StringBuilder();
-            bat.AppendLine("@echo off");
-            bat.AppendLine($"echo %date% %time% — Starting update > \"{logPath}\"");
-
-            // Wait for process to fully exit (check every 1 second, max 30s)
-            int pid = Environment.ProcessId;
-            bat.AppendLine($"echo Waiting for PID {pid} to exit...");
-            bat.AppendLine($"set /a count=0");
-            bat.AppendLine(":waitloop");
-            bat.AppendLine($"tasklist /FI \"PID eq {pid}\" 2>nul | find /i \"{pid}\" >nul");
-            bat.AppendLine($"if %ERRORLEVEL%==0 (");
-            bat.AppendLine($"  set /a count+=1");
-            bat.AppendLine($"  if %count% GEQ 30 (echo TIMEOUT waiting for exit >> \"{logPath}\" & goto copyphase)");
-            bat.AppendLine($"  timeout /t 1 /nobreak >nul");
-            bat.AppendLine($"  goto waitloop");
-            bat.AppendLine($")");
-            bat.AppendLine($"echo Process exited after %count%s >> \"{logPath}\"");
-
-            bat.AppendLine(":copyphase");
-            // Rename running exe (ren works on locked files on Windows)
-            bat.AppendLine($"del /Q \"{oldExe}\" >nul 2>&1");
-            bat.AppendLine($"ren \"{selfExe}\" \"ZapretUI_old.exe\" >nul 2>&1");
-            bat.AppendLine($"echo Renamed old exe >> \"{logPath}\"");
-            // Copy new files from stageDir to exeDir
-            bat.AppendLine($"echo Copying files...");
-            bat.AppendLine($"robocopy \"{stageDir}\" \"{exeDir}\" /E /Y /R:3 /W:1 >> \"{logPath}\" 2>&1");
-            bat.AppendLine($"echo Robocopy exit: %ERRORLEVEL% >> \"{logPath}\"");
-            // Wait for filesystem to settle
-            bat.AppendLine($"timeout /t 2 /nobreak >nul");
-            // Verify the new exe exists before starting
-            bat.AppendLine($"if exist \"{selfExe}\" (");
-            bat.AppendLine($"  echo New exe OK, starting... >> \"{logPath}\"");
-            bat.AppendLine($"  start \"\" \"{selfExe}\" --launched-after-update");
-            bat.AppendLine($"  timeout /t 3 /nobreak >nul");
-            bat.AppendLine($"  del /Q \"{oldExe}\" >nul 2>&1");
-            bat.AppendLine($") else (");
-            bat.AppendLine($"  echo New exe NOT found, restoring old exe >> \"{logPath}\"");
-            bat.AppendLine($"  ren \"{oldExe}\" \"{exeName}\" >nul 2>&1");
-            bat.AppendLine($"  echo Copy failed, NOT starting old exe to prevent update loop >> \"{logPath}\"");
-            bat.AppendLine($")");
-            // Cleanup: delete temp files (old exe already handled above)
-            bat.AppendLine($"del /Q \"{zipPath}\" >nul 2>&1");
-            bat.AppendLine($"rmdir /S /Q \"{stageDir}\" >nul 2>&1");
-            bat.AppendLine($"del /Q \"%~f0\" >nul 2>&1");
-
-            File.WriteAllText(batPath, bat.ToString(), new UTF8Encoding(false));
-
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = batPath,
-                UseShellExecute = true,
-                CreateNoWindow = false,
-            });
-
-            // Exit this process
-            await Task.Delay(500);
+            await Task.Delay(800, ct).ConfigureAwait(false);
             Environment.Exit(0);
         }
         catch
         {
             try { if (Directory.Exists(stageDir)) Directory.Delete(stageDir, true); } catch { }
+            try { if (File.Exists(zipPath)) File.Delete(zipPath); } catch { }
             throw;
         }
     }

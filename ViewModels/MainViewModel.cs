@@ -496,7 +496,12 @@ public sealed class MainViewModel : ObservableObject
 
         // Clear cooldown if update succeeded (bat launched us with the flag)
         if (launchedAfterUpdate)
+        {
             _updater.ClearUpdateCooldown();
+            string? marker = AppUpdateInstaller.ReadInstalledVersionMarker(AppUpdateInstaller.GetInstallDirectory());
+            AppendLog($"Обновление установлено: v{UpdaterService.AppVersion}" +
+                      (marker is not null ? $" (файлы: {marker})" : ""));
+        }
 
         // Copy engine binaries + data from ClassicData FIRST so the engine
         // check below finds winws2.exe without needing GitHub on a fresh install.
@@ -566,17 +571,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Обновления FTP + GitHub
-Версии с FTP и GitHub в настройках. Установка с FTP (приоритет) или GitHub.
+        return @"✦ Надёжное обновление (2.7.x → новые)
+Полная замена файлов (/MIR), удаление старых DLL, исправление zip.
 
-✦ Telegram — мост автозапуск
-tg-ws-proxy без лимита. Telegram.exe — вручную.
+✦ Обновления FTP + GitHub
+Версии с FTP и GitHub в настройках.
 
-✦ Discord — только вручную
-Автозапуск Discord Desktop отключён.
-
-✦ Авто-админ
-UAC при запуске ZapretUI.";
+✦ Telegram / Discord
+Мост Telegram автозапуск. Discord и Telegram.exe — вручную.";
     }
 
     private void AutoImportClassicPresets(bool force = false)
