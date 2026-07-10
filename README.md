@@ -4,10 +4,13 @@
 
 # Zapret UI
 
-**Графическая оболочка для движка обхода DPI [zapret2](https://github.com/bol-van/zapret2) (winws2) под Windows**
+**Графическая оболочка для обхода DPI на Windows**  
+Движок [zapret2](https://github.com/bol-van/zapret2) (winws2) + готовые пресеты, hosts и автообновление.
 
-Скачивает движок с GitHub, проверяет контрольные суммы, держит его в актуальном
-состоянии — и даёт обходить блокировки одной кнопкой, без правки `.cmd`-файлов вручную.
+[![Последняя версия](https://img.shields.io/github/v/release/kayucm21/Zanpet?label=версия)](https://github.com/kayucm21/Zanpet/releases/latest)
+[![Windows](https://img.shields.io/badge/Windows-10%2F11%20x64-blue)](https://github.com/kayucm21/Zanpet/releases/latest)
+
+**Скачать:** [ZapretUI-v2.9.11.zip](https://github.com/kayucm21/Zanpet/releases/download/v2.9.11/ZapretUI-v2.9.11.zip)
 
 </div>
 
@@ -15,75 +18,84 @@
 
 ## Что это
 
-**Zapret UI** — обход DPI блокировок + встроенный VPN (VLESS/REALITY через xray-core).
+**Zapret UI** — программа для обхода блокировок DPI одной кнопкой. Не нужно вручную править `.cmd`, hosts или стратегии: всё уже настроено в пресетах.
 
-Движок **winws2** стоит между приложением и сетью и портит/разбивает первый пакет так, что DPI его не распознаёт, а настоящий сервер — понимает. Встроенный VPN позволяет обходить блокировки по IP через подписку.
+Движок **winws2** перехватывает трафик и искажает первые пакеты так, что DPI их не распознаёт, а сервер принимает соединение нормально.
+
+Дополнительно: встроенный **VPN** (VLESS/REALITY через xray-core) и **автообновление** с FTP и GitHub.
 
 ---
 
 ## Быстрый старт
 
-1. Запустите **от администратора**.
-2. Нажмите **«Включить обход»** — применится рекомендуемый пресет.
-3. Проверьте нужный сайт.
+1. Скачайте [последний релиз](https://github.com/kayucm21/Zanpet/releases/latest) и распакуйте.
+2. Запустите **ZapretUI.exe от администратора**.
+3. Выберите пресет (например, *YouTube + Discord + Telegram*) и нажмите **«Включить обход»**.
+4. Откройте нужный сайт или приложение.
 
-**VPN:** вкладка VPN → скачайте xray → подключитесь к серверу.
+**Обновление:** *Настройки → Проверить обновления* (FTP + GitHub).
+
+---
+
+## Что обходит
+
+| Сервис | Как |
+|--------|-----|
+| **YouTube** | winws + ipset для QUIC |
+| **Discord** | hosts + TLS-стратегии + UDP для войса |
+| **Telegram Web** | hosts + hostfakesplit |
+| **Telegram Desktop** | tg-ws-proxy (мост MTProto → WebSocket), автозапуск с обходом |
+| **TikTok / Instagram / WhatsApp** | hosts + пресеты для CDN и веб-версий |
+
+Discord и Telegram Desktop **не запускаются автоматически** — открываете сами, обход уже работает.
 
 ---
 
 ## Возможности
 
-- **Обход DPI** — старт/стоп одной кнопкой, автоподбор стратегии, готовые пресеты.
-- **Встроенный VPN** — VLESS/REALITY через xray-core, подписка с серверами, пинг, автообновление.
-- **Автообновление** — проверка обновлений приложения и движка с GitHub, скачивание и установка одной кнопкой.
-- **Тёмная тема** (по умолчанию) и **светлая тема** — переключение в настройках.
-
----
-
-## v2.5.0 — Что нового
-
-### Движок
-- **zapret2 v1.0.2** (engine 2.0.0) — последняя версия движка
-- Обновлённые Lua-скрипты с новыми функциями
-
-### Новые пресеты (функции движка 2.0.0)
-| Пресет | Функция | Описание |
-|--------|---------|----------|
-| **Multidisorder Advanced** | `multidisorder` | Множественный disorder + multisplit с seqovl |
-| **FakeSplit Pro** | `fakedsplit` + `fakeddisorder` | Двойное искажение: поддельные сегменты перед реальными |
-| **TCP Segmentation** | `tcpseg` | Агрессивная сегментация TCP с наложением |
-| **OOB Injection** | `oob` | Out-of-band injection с URG-флагом |
-
-### Оптимизация
-- **Shared HttpClient** — единый пул соединений
-- **Кэширование пресетов** — `PresetService.All` кэшируется
-- **Async Stop** — неблокирующая остановка движка (`StopAsync`)
-- **CancellationToken disposal** — корректная очистка `MonitorService`
-- **SettingsVersion** — схема миграции настроек
+- **Обход DPI** — старт/стоп одной кнопкой, готовые пресеты, автоподбор стратегии
+- **Автообновление** — приложение и движок с **FTP** (основной) и **GitHub** (зеркало)
+- **Надёжный апдейтер** — полная замена файлов с любой версии 2.7.x+, лог в `%LOCALAPPDATA%\ZapretUI\logs\update.log`
+- **VPN** — VLESS/REALITY, подписка, пинг, автообновление серверов
+- **Тёмная и светлая тема**
+- **Трей** — сворачивание, иконка меняется при активном обходе
 
 ---
 
 ## Требования
 
-- Windows 10/11 x64.
-- Права администратора — обязательны: WinDivert загружает драйвер в ядро.
-- Интернет при первом запуске (для загрузки движка).
+- Windows 10/11 **x64**
+- Права **администратора** (WinDivert загружает драйвер в ядро)
+- Интернет при первом запуске (загрузка движка zapret2)
 
-## Сборка из исходников
+---
+
+## Сборка
 
 ```powershell
-dotnet publish ZapretUI.csproj -c Release -r win-x64 --self-contained -o publish
+# Сборка + zip с проверкой версии в exe
+powershell -File Scripts\Build-ReleaseZip.ps1
+
+# Публикация на FTP (параметры — свои)
+powershell -File Scripts\Publish-FtpUpdate.ps1 -FtpHost HOST -FtpUser USER -FtpPassword PASS -FtpPath /updates
 ```
 
-## Структура
+Результат: `bin\Release\net9.0-windows\win-x64\publish\ZapretUI-vX.Y.Z.zip`
 
-- `Services/` — EngineService, VpnService, UpdaterService, PresetService, HttpFactory и др.
-- `ViewModels/MainViewModel.cs` — MVVM координатор.
-- `Themes/Theme.xaml` — тёмная тема.
-- `Themes/LightTheme.xaml` — светлая тема.
-- `Services/ThemeManager.cs` — динамическое переключение тем.
-- `MainWindow.xaml` — окно: заголовок, вкладки (Главная · Стратегии · Настройки · VPN · Журнал).
+---
+
+## Структура проекта
+
+| Папка / файл | Назначение |
+|--------------|------------|
+| `Services/` | EngineService, UpdaterService, PresetService, TgWsProxyService и др. |
+| `ViewModels/MainViewModel.cs` | MVVM-координатор |
+| `Themes/` | Тёмная и светлая тема |
+| `Scripts/` | Сборка релиза и загрузка на FTP |
+| `ClassicData/` | Пресеты, списки, бинарники движка |
+
+---
 
 ## Лицензия
 
-MIT. Движок winws2 распространяется по своей лицензии — см. репозиторий zapret2.
+MIT. Движок winws2 — по лицензии [zapret2](https://github.com/bol-van/zapret2).
