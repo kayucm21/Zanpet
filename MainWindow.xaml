@@ -520,16 +520,38 @@
                             <TextBlock Text="Настройки" Style="{StaticResource H1}" Margin="2,0,0,16"/>
                             <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                                 <StackPanel>
-                                    <TextBlock Text="Движок" Style="{StaticResource H2}" Margin="0,0,0,12"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                        <TextBlock Text="Установленная версия:" Style="{StaticResource Muted}" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding EngineVersion}" Margin="8,0,0,0" VerticalAlignment="Center"
-                                                   FontWeight="SemiBold"/>
+                                    <TextBlock Text="Приложение" Style="{StaticResource H2}" Margin="0,0,0,12"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="Версия:" Style="{StaticResource Muted}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding AppVersion}" Margin="8,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                        <TextBlock Text="FTP:" Style="{StaticResource Muted}" Width="72" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding AppUpdateFtpVersion}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                        <TextBlock Text="GitHub:" Style="{StaticResource Muted}" Width="72" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding AppUpdateGitHubVersion}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="Доступно:" Style="{StaticResource Muted}" Width="72" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding AppUpdateAvailable}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                                         <Button Content="Проверить обновления" Command="{Binding CheckUpdateCommand}"
                                                 Style="{StaticResource GhostButton}" Margin="16,0,0,0"/>
                                     </StackPanel>
                                     <TextBlock Text="{Binding UpdateStatus}" Style="{StaticResource Muted}" FontSize="11.5"
                                                TextWrapping="Wrap" Margin="0,0,0,4"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="Движок" Style="{StaticResource H2}" Margin="0,0,0,12"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                        <TextBlock Text="Установленная версия:" Style="{StaticResource Muted}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding EngineVersion}" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                   FontWeight="SemiBold"/>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
 

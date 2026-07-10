@@ -1,10 +1,6 @@
-whatsapp.com
-whatsapp.net
-whatsapp.co
-wa.me
-wl.co
-whatsappbrand.com
 web.whatsapp.com
+www.web.whatsapp.com
+www.whatsapp.com
 static.whatsapp.net
 mmg.whatsapp.net
 g.whatsapp.net
@@ -14,6 +10,10 @@ graph.whatsapp.com
 pps.whatsapp.net
 graph.facebook.com
 connect.facebook.net
-facebook.com
+www.facebook.com
+m.facebook.com
+web-fallback.whatsapp.net
+edge-chat.facebook.com
+star.fallback.c10r.facebook.com
 fbcdn.net
 challenges.cloudflare.com

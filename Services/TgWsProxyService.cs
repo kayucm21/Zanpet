@@ -27,6 +27,7 @@ public sealed class TgWsProxyService : IDisposable
 
     private Process? _proc;
     private CancellationTokenSource? _clickerCts;
+    private CancellationTokenSource? _watchCts;
     private bool _proxyAppliedThisSession;
     private bool _deeplinkSent;
     private string? _loggedTelegramPath;
@@ -115,7 +116,7 @@ public sealed class TgWsProxyService : IDisposable
                     : $"Мост Telegram не запустился.{logHint}");
         }
 
-        Emit($"Telegram Desktop: мост {DefaultHost}:{DefaultPort}");
+        Emit($"Telegram: мост {DefaultHost}:{DefaultPort}");
         await ApplyProxyOnceAsync(ct).ConfigureAwait(false);
     }
 
@@ -124,16 +125,58 @@ public sealed class TgWsProxyService : IDisposable
         if (_proxyAppliedThisSession) return;
 
         StartDialogAutoClicker(ct);
+        bool applied = false;
         foreach (int delay in ApplyDelaysMs)
         {
             if (delay > 0)
                 await Task.Delay(delay, ct).ConfigureAwait(false);
             if (TryApplyProxyToDesktop())
+            {
+                applied = true;
                 break;
+            }
         }
 
-        _proxyAppliedThisSession = true;
-        StopDialogAutoClicker();
+        if (applied)
+        {
+            _proxyAppliedThisSession = true;
+            StopDialogAutoClicker();
+            StopTelegramWatch();
+        }
+        else
+        {
+            Emit("Telegram: мост готов — запустите Telegram Desktop вручную");
+            StartTelegramWatch(ct);
+        }
+    }
+
+    private void StartTelegramWatch(CancellationToken outerCt)
+    {
+        StopTelegramWatch();
+        _watchCts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
+        var token = _watchCts.Token;
+        _ = Task.Run(async () =>
+        {
+            while (!token.IsCancellationRequested && IsRunning)
+            {
+                if (TryApplyProxyToDesktop())
+                {
+                    _proxyAppliedThisSession = true;
+                    StopDialogAutoClicker();
+                    StopTelegramWatch();
+                    return;
+                }
+                try { await Task.Delay(3000, token).ConfigureAwait(false); }
+                catch (OperationCanceledException) { return; }
+            }
+        }, token);
+    }
+
+    private void StopTelegramWatch()
+    {
+        try { _watchCts?.Cancel(); } catch { }
+        _watchCts?.Dispose();
+        _watchCts = null;
     }
 
     private void StartDialogAutoClicker(CancellationToken outerCt)
@@ -144,7 +187,7 @@ public sealed class TgWsProxyService : IDisposable
         _ = Task.Run(() => TelegramProxyUiHelper.RunFor(TimeSpan.FromSeconds(12), token), token);
     }
 
-    /// <returns>True when proxy deeplink was sent or Telegram is already running (clicker handles dialog).</returns>
+    /// <returns>True when proxy was applied to a running Telegram process.</returns>
     private bool TryApplyProxyToDesktop()
     {
         var located = TelegramLocator.Locate();
@@ -157,48 +200,33 @@ public sealed class TgWsProxyService : IDisposable
                 Emit($"Telegram Desktop: найден — {located.ExePath}");
             }
         }
-        else if (located.ProcessRunning)
-        {
-            Emit($"Telegram Desktop: процесс запущен ({located.ProcessCount} шт.), автоподключение прокси…");
-            TelegramProxyUiHelper.TryClickOnce();
-            return true;
-        }
-        else
-        {
-            Emit("Telegram Desktop: не найден — запустите Telegram вручную");
+
+        if (!located.ProcessRunning)
             return false;
-        }
 
-        bool wasRunning = located.ProcessRunning;
-        if (_deeplinkSent)
-        {
-            TelegramProxyUiHelper.TryClickOnce();
-            return true;
-        }
+        Emit($"Telegram Desktop: процесс запущен ({located.ProcessCount} шт.), подключение прокси…");
 
-        try
+        if (!_deeplinkSent)
         {
-            Process.Start(new ProcessStartInfo
+            try
             {
-                FileName = located.ExePath,
-                Arguments = $"-- \"{ProxyDeeplink}\"",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            });
-            _deeplinkSent = true;
-
-            if (!wasRunning)
-                Emit("Telegram Desktop: запуск с автопрокси");
-            else
-                Emit("Telegram Desktop: прокси применён (один раз за сессию)");
-
-            return true;
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = ProxyDeeplink,
+                    UseShellExecute = true,
+                });
+                _deeplinkSent = true;
+                Emit("Telegram Desktop: прокси применён");
+            }
+            catch (Exception ex)
+            {
+                Emit($"Telegram Desktop: {ex.Message}");
+                return false;
+            }
         }
-        catch (Exception ex)
-        {
-            Emit($"Telegram Desktop: {ex.Message}");
-            return false;
-        }
+
+        TelegramProxyUiHelper.TryClickOnce();
+        return true;
     }
 
     private void StopDialogAutoClicker()
@@ -295,6 +323,7 @@ public sealed class TgWsProxyService : IDisposable
     public void Stop()
     {
         StopDialogAutoClicker();
+        StopTelegramWatch();
         _proxyAppliedThisSession = false;
         _deeplinkSent = false;
         if (_proc is null) return;

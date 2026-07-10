@@ -24,6 +24,9 @@ public sealed class MainViewModel : ObservableObject
     private readonly TgWsProxyService _tgWs = new();
     private readonly TelegramHostsService _telegramHosts = new();
     private readonly DiscordHostsService _discordHosts = new();
+    private readonly SocialHostsService _socialHosts = new();
+    private readonly DiscordDesktopService _discordDesktop = new();
+    private readonly DiscordShopBridgeService _discordShopBridge;
 
     public event Action<string, string>? Notify;
 
@@ -31,20 +34,27 @@ public sealed class MainViewModel : ObservableObject
 
     public MainViewModel()
     {
+        _discordShopBridge = new DiscordShopBridgeService(_vpn);
         _engine.StateChanged += s => OnUi(() =>
         {
             State = s;
             if (s == EngineState.Stopped)
             {
                 _tgWs.Stop();
+                _discordShopBridge.Stop();
+                _discordDesktop.Reset();
                 _telegramHosts.Remove();
                 _discordHosts.Remove();
+                _socialHosts.RemoveAll();
             }
         });
         _engine.LogLine += line => OnUi(() => AppendLog(line));
         _tgWs.LogLine += line => OnUi(() => AppendLog(line));
         _telegramHosts.LogLine += line => OnUi(() => AppendLog(line));
         _discordHosts.LogLine += line => OnUi(() => AppendLog(line));
+        _socialHosts.LogLine += line => OnUi(() => AppendLog(line));
+        _discordDesktop.LogLine += line => OnUi(() => AppendLog(line));
+        _discordShopBridge.LogLine += line => OnUi(() => AppendLog(line));
 
         StartCommand = new RelayCommand(async _ => await StartAsync(), _ => CanStart);
         StopCommand = new RelayCommand(_ => _engine.Stop(), _ => CanStop);
@@ -289,6 +299,15 @@ public sealed class MainViewModel : ObservableObject
     public string EngineVersion { get => _engineVersion; private set => SetField(ref _engineVersion, value); }
 
     public string AppVersion => "v" + UpdaterService.AppVersion;
+
+    private string _appUpdateFtpVersion = "—";
+    public string AppUpdateFtpVersion { get => _appUpdateFtpVersion; private set => SetField(ref _appUpdateFtpVersion, value); }
+
+    private string _appUpdateGitHubVersion = "—";
+    public string AppUpdateGitHubVersion { get => _appUpdateGitHubVersion; private set => SetField(ref _appUpdateGitHubVersion, value); }
+
+    private string _appUpdateAvailable = "—";
+    public string AppUpdateAvailable { get => _appUpdateAvailable; private set => SetField(ref _appUpdateAvailable, value); }
 
     // ---- VPN ---------------------------------------------------------------
 
@@ -547,14 +566,17 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Telegram Desktop — автомост
-Тихий мост MTProto→WebSocket (как веб-Telegram). Прокси включается сам, браузер не открывается.
+        return @"✦ Обновления FTP + GitHub
+Версии с FTP и GitHub в настройках. Установка с FTP (приоритет) или GitHub.
 
-✦ MTProto DC
-Профили ipset для прямых подключений к дата-центрам.
+✦ Telegram — мост автозапуск
+tg-ws-proxy без лимита. Telegram.exe — вручную.
 
-✦ Hosts + TLS
-Как Discord — hosts и tls_multisplit для доменов Telegram.";
+✦ Discord — только вручную
+Автозапуск Discord Desktop отключён.
+
+✦ Авто-админ
+UAC при запуске ZapretUI.";
     }
 
     private void AutoImportClassicPresets(bool force = false)
@@ -682,13 +704,27 @@ public sealed class MainViewModel : ObservableObject
                 }
             }
 
-            // --- 2. Check app update (kayucm21/Zanpet) ---
+            // --- 2. Check app update (FTP + GitHub) ---
             try
             {
-                var appLatest = await _updater.FetchAppLatestAsync();
-                if (appLatest is { } appInfo && UpdaterService.IsAppUpdate(appInfo.Tag))
+                var ftpCfg = FtpUpdateSettings.Resolve(Settings);
+                var snap = await _updater.FetchAppUpdateSnapshotAsync(ftpCfg);
+
+                AppUpdateFtpVersion = snap.FtpDisplay;
+                AppUpdateGitHubVersion = snap.GitHubDisplay;
+                AppendLog($"Приложение: установлено v{snap.CurrentVersion} | FTP: {snap.FtpDisplay} | GitHub: {snap.GitHubDisplay}");
+
+                if (snap.HasUpdate && snap.NewestRelease is { } appInfo)
                 {
-                    string appMsg = $"Доступно обновление приложения: {appInfo.Tag}";
+                    string sourceLabel = appInfo.Source switch
+                    {
+                        AppReleaseSource.Ftp => "FTP",
+                        AppReleaseSource.Yandex => "Yandex Disk",
+                        AppReleaseSource.Cdn => "CDN",
+                        _ => "GitHub",
+                    };
+                    AppUpdateAvailable = $"v{appInfo.Tag} ({sourceLabel})";
+                    string appMsg = $"Доступно обновление: v{appInfo.Tag} ({sourceLabel}) | FTP: {snap.FtpDisplay} | GitHub: {snap.GitHubDisplay}";
                     UpdateStatus = appMsg;
                     AppendLog(appMsg);
 
@@ -700,7 +736,7 @@ public sealed class MainViewModel : ObservableObject
                     else
                     {
                         var result = MessageBox.Show(
-                            $"Доступна новая версия приложения: {appInfo.Tag}\n\nСкачать и установить?",
+                            $"Установлено: v{snap.CurrentVersion}\nFTP: {snap.FtpDisplay}\nGitHub: {snap.GitHubDisplay}\n\nДоступно: v{appInfo.Tag} ({sourceLabel})\n\nСкачать и установить?",
                             "Обновление приложения",
                             MessageBoxButton.YesNo, MessageBoxImage.Information);
                         if (result == MessageBoxResult.Yes) doInstall = true;
@@ -708,16 +744,16 @@ public sealed class MainViewModel : ObservableObject
 
                     if (doInstall)
                     {
-                        UpdateStatus = $"Загрузка {appInfo.Tag}…";
-                        AppendLog($"Загрузка обновления {appInfo.Tag}…");
+                        UpdateStatus = $"Загрузка v{appInfo.Tag} с {sourceLabel}…";
+                        AppendLog($"Загрузка обновления v{appInfo.Tag} с {sourceLabel}…");
                         var progress = new Progress<double>(p =>
                         {
                             UpdateProgress = p;
-                            UpdateStatus = $"Загрузка {appInfo.Tag}… {p:P0}";
+                            UpdateStatus = $"Загрузка v{appInfo.Tag} ({sourceLabel})… {p:P0}";
                         });
                         try
                         {
-                            await _updater.InstallAppUpdateAsync(appInfo.Tag, progress);
+                            await _updater.InstallAppUpdateAsync(appInfo, ftpCfg, progress);
                         }
                         catch (Exception ex)
                         {
@@ -728,15 +764,17 @@ public sealed class MainViewModel : ObservableObject
                         }
                     }
                 }
-                else if (appLatest is null)
+                else if (snap.Ftp is null && snap.GitHub is null)
                 {
-                    string msg = "Не удалось проверить обновление приложения (GitHub недоступен).";
+                    AppUpdateAvailable = "недоступно";
+                    string msg = "Не удалось проверить обновление (FTP и GitHub недоступны).";
                     UpdateStatus = msg;
                     AppendLog(msg);
                 }
                 else
                 {
-                    string msg = $"Приложение актуально: v{UpdaterService.AppVersion}";
+                    AppUpdateAvailable = "актуально";
+                    string msg = $"Приложение актуально: v{snap.CurrentVersion} | FTP: {snap.FtpDisplay} | GitHub: {snap.GitHubDisplay}";
                     UpdateStatus = msg;
                     AppendLog(msg);
                 }
@@ -767,22 +805,49 @@ public sealed class MainViewModel : ObservableObject
                 _discordHosts.Apply();
             if (Settings.TelegramWebHosts && PresetHasService(SelectedPreset, "Telegram"))
                 _telegramHosts.Apply();
+            if (Settings.TikTokWebHosts)
+                _socialHosts.ApplyTikTok();
+            if (Settings.InstagramWebHosts)
+                _socialHosts.ApplyInstagram();
+            if (Settings.WhatsAppWebHosts)
+                _socialHosts.ApplyWhatsApp();
 
             _engine.Start(SelectedPreset, SelectedPreset.UsesHostlist ? null : null);
             RunningPreset = SelectedPreset;
 
-            // Desktop bridge AFTER winws — tunnel uses web.telegram.org (needs bypass first).
+            bool discordInPreset = PresetHasService(SelectedPreset, "Discord");
+            bool shopBridgeOk = false;
+            if (discordInPreset && Settings.DiscordShopBridge)
+                shopBridgeOk = await _discordShopBridge.StartAsync().ConfigureAwait(false);
+
+            _discordDesktop.UseShopVpnProxy = shopBridgeOk;
+
+            var desktopTasks = new List<Task>();
+
+            if (Settings.DiscordDesktopAutoLaunch && discordInPreset)
+            {
+                desktopTasks.Add(Task.Run(async () =>
+                {
+                    await Task.Delay(shopBridgeOk ? 500 : 300);
+                    try { await _discordDesktop.StartAsync(); }
+                    catch (Exception ex) { AppendLog($"Discord Desktop: {ex.Message}"); }
+                }));
+            }
+
             if (Settings.TelegramWsProxy && PresetHasService(SelectedPreset, "Telegram"))
             {
                 if (!string.IsNullOrWhiteSpace(Settings.TelegramWsProxySecret))
                     _tgWs.Secret = Settings.TelegramWsProxySecret.Trim();
-                try
+                desktopTasks.Add(Task.Run(async () =>
                 {
-                    await Task.Delay(1500);
-                    await _tgWs.StartAsync();
-                }
-                catch (Exception ex) { AppendLog($"Telegram Desktop: {ex.Message}"); }
+                    await Task.Delay(1200);
+                    try { await _tgWs.StartAsync(); }
+                    catch (Exception ex) { AppendLog($"Telegram Desktop: {ex.Message}"); }
+                }));
             }
+
+            if (desktopTasks.Count > 0)
+                await Task.WhenAll(desktopTasks);
         }
         catch (Exception ex)
         {
@@ -885,6 +950,7 @@ public sealed class MainViewModel : ObservableObject
     public void Shutdown()
     {
         try { _discordHosts.Remove(); } catch { }
+        try { _socialHosts.RemoveAll(); } catch { }
         try { _telegramHosts.Remove(); } catch { }
         try { _monitor.Dispose(); } catch { }
         try { _vpn.Dispose(); } catch { }
@@ -983,46 +1049,8 @@ public sealed class MainViewModel : ObservableObject
                 if (s != server) serversToTry.Add(s);
             }
 
-            bool connected = false;
-            foreach (var srv in serversToTry)
-            {
-                foreach (var s in VpnServers) s.IsConnected = false;
-                srv.IsConnected = true;
-                _vpn.Start(srv);
-                VpnConnectedServerName = srv.Name;
-                VpnStatus = $"Подключение к {srv.Name} ({srv.Network}:{srv.Port})…";
-                OnPropertyChanged(nameof(IsVpnConnected));
-                OnPropertyChanged(nameof(VpnConnectedServerName));
-                AppendLog($"VPN: подключение к {srv.Name} ({srv.Address}:{srv.Port})…");
-
-                await Task.Delay(3000);
-
-                if (!_vpn.IsConnected)
-                {
-                    srv.IsConnected = false;
-                    AppendLog($"VPN: {srv.Name} — xray завершился. Пробую следующий сервер…");
-                    continue;
-                }
-
-                VpnStatus = $"Подключение к {srv.Name}. Проверка прокси…";
-                AppendLog($"VPN: xray работает. Проверяю доступность интернета…");
-                bool ok = await _vpn.TestProxyAsync();
-                if (ok)
-                {
-                    connected = true;
-                    VpnStatus = $"Подключено к {srv.Name}. Работает!";
-                    AppendLog($"VPN: HTTP-прокси работает! Интернет через VPN ({srv.Name}).");
-                    AppendLog("VPN: Если сайты не открывается — перезапустите браузер!");
-                    break;
-                }
-                else
-                {
-                    AppendLog($"VPN: {srv.Name} — прокси не отвечает. Останавливаю, пробую другой…");
-                    await Task.Run(() => _vpn.Stop());
-                    srv.IsConnected = false;
-                    await Task.Delay(500);
-                }
-            }
+            bool connected = await TryConnectVpnAsync(serversToTry, Settings.DiscordShopVpnBridge, updateUi: true)
+                .ConfigureAwait(false);
 
             if (!connected)
             {
@@ -1038,6 +1066,59 @@ public sealed class MainViewModel : ObservableObject
             VpnStatus = $"Ошибка: {ex.Message}";
             AppendLog($"VPN ошибка: {ex.Message}");
         }
+    }
+
+    /// <summary>Try servers in order; returns true when xray proxy responds.</summary>
+    private async Task<bool> TryConnectVpnAsync(IReadOnlyList<VpnServer> serversToTry, bool discordThroughVpn,
+        bool updateUi)
+    {
+        foreach (var srv in serversToTry)
+        {
+            if (updateUi)
+            {
+                foreach (var s in VpnServers) s.IsConnected = false;
+                srv.IsConnected = true;
+                VpnConnectedServerName = srv.Name;
+                VpnStatus = $"Подключение к {srv.Name} ({srv.Network}:{srv.Port})…";
+                OnPropertyChanged(nameof(IsVpnConnected));
+                OnPropertyChanged(nameof(VpnConnectedServerName));
+            }
+
+            AppendLog($"VPN: подключение к {srv.Name} ({srv.Address}:{srv.Port})…");
+            await Task.Run(() => _vpn.Start(srv, discordThroughVpn)).ConfigureAwait(false);
+
+            await Task.Delay(3000).ConfigureAwait(false);
+
+            if (!_vpn.IsConnected)
+            {
+                if (updateUi) srv.IsConnected = false;
+                AppendLog($"VPN: {srv.Name} — xray завершился. Пробую следующий сервер…");
+                continue;
+            }
+
+            if (updateUi)
+                VpnStatus = $"Подключение к {srv.Name}. Проверка прокси…";
+            AppendLog("VPN: xray работает. Проверяю доступность интернета…");
+            bool ok = await _vpn.TestProxyAsync().ConfigureAwait(false);
+            if (ok)
+            {
+                if (updateUi)
+                {
+                    VpnStatus = $"Подключено к {srv.Name}. Работает!";
+                    AppendLog($"VPN: HTTP-прокси работает! Интернет через VPN ({srv.Name}).");
+                    if (!discordThroughVpn)
+                        AppendLog("VPN: Если сайты не открывается — перезапустите браузер!");
+                }
+                return true;
+            }
+
+            AppendLog($"VPN: {srv.Name} — прокси не отвечает. Останавливаю, пробую другой…");
+            await Task.Run(() => _vpn.Stop()).ConfigureAwait(false);
+            if (updateUi) srv.IsConnected = false;
+            await Task.Delay(500).ConfigureAwait(false);
+        }
+
+        return false;
     }
 
     private async Task VpnPingAllAsync()

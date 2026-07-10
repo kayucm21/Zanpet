@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "host": "ftp.example.com",
+  "port": 21,
+  "useSsl": false,
+  "user": "your_ftp_login",
+  "password": "your_ftp_password",
+  "remotePath": "/updates"
+}

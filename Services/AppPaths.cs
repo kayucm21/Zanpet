@@ -34,6 +34,9 @@ public static class AppPaths
     public static string PresetsFile => Path.Combine(Root, "presets.json");
     public static string SettingsFile => Path.Combine(Root, "settings.json");
 
+    /// <summary>FTP update server credentials (optional, overrides built-in defaults).</summary>
+    public static string FtpUpdateConfigFile => Path.Combine(Root, "ftp-update.json");
+
     // Scratch space for downloads
     public static string TempDir => Path.Combine(Root, "tmp");
 

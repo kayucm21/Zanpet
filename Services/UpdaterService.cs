@@ -77,10 +77,36 @@ public sealed class UpdaterService
         }
     }
 
-    /// <summary>Latest app release (tag + page URL) from GitHub, or null on any failure.</summary>
-    public async Task<(string Tag, string Url)?> FetchAppLatestAsync(CancellationToken ct = default)
+    /// <summary>Check FTP + GitHub in parallel; pick newest for install (FTP wins on tie).</summary>
+    public async Task<AppUpdateSnapshot> FetchAppUpdateSnapshotAsync(
+        FtpUpdateSettings? ftpSettings = null,
+        CancellationToken ct = default)
     {
-        // Try API first
+        ftpSettings ??= FtpUpdateSettings.Resolve();
+        var ftpTask = FetchAppFromFtpAsync(ftpSettings, ct);
+        var ghTask = FetchAppFromGitHubAsync(ct);
+        await Task.WhenAll(ftpTask, ghTask).ConfigureAwait(false);
+        return new AppUpdateSnapshot(AppVersion, await ftpTask.ConfigureAwait(false), await ghTask.ConfigureAwait(false));
+    }
+
+    public async Task<AppReleaseInfo?> FetchAppFromFtpAsync(
+        FtpUpdateSettings? ftpSettings = null,
+        CancellationToken ct = default)
+    {
+        ftpSettings ??= FtpUpdateSettings.Resolve();
+        if (!ftpSettings.IsConfigured) return null;
+        try
+        {
+            return await FtpUpdateService.FetchLatestAsync(ftpSettings, ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<AppReleaseInfo?> FetchAppFromGitHubAsync(CancellationToken ct = default)
+    {
         try
         {
             using var resp = await Http.GetAsync(AppReleasesLatestApi, ct).ConfigureAwait(false);
@@ -91,26 +117,35 @@ public sealed class UpdaterService
             string tag = root.GetProperty("tag_name").GetString() ?? "";
             string url = root.TryGetProperty("html_url", out var u) ? (u.GetString() ?? "") : "";
             if (string.IsNullOrEmpty(url)) url = AppReleasesPage;
-            if (!string.IsNullOrEmpty(tag)) return (tag, url);
+            if (!string.IsNullOrEmpty(tag))
+                return new AppReleaseInfo(tag.TrimStart('v'), url, AppReleaseSource.GitHub);
         }
-        catch { /* API blocked or failed, try web fallback */ }
+        catch { /* API blocked */ }
 
-        // Web fallback: scrape the releases page HTML
         try
         {
             using var resp = await Http.GetAsync(AppReleasesPage, ct).ConfigureAwait(false);
             resp.EnsureSuccessStatusCode();
             string html = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            // Look for tag in /releases/tag/vX.Y.Z pattern
-            var m = System.Text.RegularExpressions.Regex.Match(html, @"/releases/tag/([^""\s]+)");
+            var m = Regex.Match(html, @"/releases/tag/([^""\s]+)");
             if (m.Success)
             {
                 string tag = m.Groups[1].Value.TrimStart('v');
-                return (tag, AppReleasesPage);
+                return new AppReleaseInfo(tag, AppReleasesPage, AppReleaseSource.GitHub);
             }
         }
-        catch { /* both paths failed */ }
+        catch { }
+
         return null;
+    }
+
+    /// <summary>Latest app release — prefers newest of FTP/GitHub (FTP on tie).</summary>
+    public async Task<AppReleaseInfo?> FetchAppLatestAsync(
+        FtpUpdateSettings? ftpSettings = null,
+        CancellationToken ct = default)
+    {
+        var snap = await FetchAppUpdateSnapshotAsync(ftpSettings, ct).ConfigureAwait(false);
+        return snap.NewestRelease;
     }
 
     /// <summary>Fetch the zip download URL for a specific app release tag.</summary>
@@ -186,23 +221,14 @@ public sealed class UpdaterService
     }
 
     /// <summary>Download app update, extract, replace files and restart.</summary>
-    public async Task InstallAppUpdateAsync(string tag, IProgress<double>? progress = null, CancellationToken ct = default)
+    public async Task InstallAppUpdateAsync(
+        AppReleaseInfo release,
+        FtpUpdateSettings? ftpSettings = null,
+        IProgress<double>? progress = null,
+        CancellationToken ct = default)
     {
         WriteCooldown();
-        string? zipUrl = await FetchAppZipUrlAsync(tag, ct).ConfigureAwait(false);
-
-        // Build fallback URLs: GitHub primary → Yandex Disk → CDN
-        var urls = new List<string>();
-        if (zipUrl is not null) urls.Add(zipUrl);
-
-        // Resolve Yandex Disk share link to actual download URL
-        string? yandexUrl = await ResolveYandexDiskUrlAsync(ct).ConfigureAwait(false);
-        if (yandexUrl is not null) urls.Add(yandexUrl);
-
-        if (!string.IsNullOrEmpty(AppCdnFallback)) urls.Add(AppCdnFallback);
-
-        if (urls.Count == 0) throw new InvalidOperationException("Не найден zip-файл релиза.");
-
+        string tag = release.Tag.TrimStart('v');
         string zipPath = Path.Combine(Path.GetTempPath(), $"ZapretUI-{tag}.zip");
         string stageDir = Path.Combine(Path.GetTempPath(), $"ZapretUI-stage-{Guid.NewGuid():N}");
 
@@ -212,39 +238,61 @@ public sealed class UpdaterService
             bool downloaded = false;
             Exception? lastError = null;
 
-            foreach (var downloadUrl in urls)
+            if (release.Source == AppReleaseSource.Ftp && !string.IsNullOrEmpty(release.FtpZipFile))
             {
+                ftpSettings ??= FtpUpdateSettings.Resolve();
                 try
                 {
-                    using var dl = await HttpFactory.General.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-                    dl.EnsureSuccessStatusCode();
-                    long total = dl.Content.Headers.ContentLength ?? 0;
-                    await using var stream = await dl.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-                    await using var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, true);
-                    var buf = new byte[1 << 16];
-                    long read = 0;
-                    int n;
-                    while ((n = await stream.ReadAsync(buf, ct).ConfigureAwait(false)) > 0)
-                    {
-                        await fs.WriteAsync(buf.AsMemory(0, n), ct).ConfigureAwait(false);
-                        read += n;
-                        if (total > 0)
-                        {
-                            double frac = Math.Clamp((double)read / total, 0, 1);
-                            progress?.Report(frac);
-                        }
-                    }
+                    await FtpUpdateService.DownloadZipAsync(
+                        ftpSettings, release.FtpZipFile, zipPath, progress, ct).ConfigureAwait(false);
                     downloaded = true;
-                    break;
                 }
-                catch (Exception ex)
+                catch (Exception ex) { lastError = ex; }
+            }
+
+            if (!downloaded)
+            {
+                string? zipUrl = await FetchAppZipUrlAsync(tag, ct).ConfigureAwait(false);
+                var urls = new List<string>();
+                if (zipUrl is not null) urls.Add(zipUrl);
+
+                string? yandexUrl = await ResolveYandexDiskUrlAsync(ct).ConfigureAwait(false);
+                if (yandexUrl is not null) urls.Add(yandexUrl);
+
+                if (!string.IsNullOrEmpty(AppCdnFallback)) urls.Add(AppCdnFallback);
+
+                if (urls.Count == 0)
+                    throw lastError ?? new InvalidOperationException("Не найден zip-файл релиза.");
+
+                foreach (var downloadUrl in urls)
                 {
-                    lastError = ex;
+                    try
+                    {
+                        using var dl = await HttpFactory.General.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                        dl.EnsureSuccessStatusCode();
+                        long total = dl.Content.Headers.ContentLength ?? 0;
+                        await using var stream = await dl.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                        await using var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, true);
+                        var buf = new byte[1 << 16];
+                        long read = 0;
+                        int n;
+                        while ((n = await stream.ReadAsync(buf, ct).ConfigureAwait(false)) > 0)
+                        {
+                            await fs.WriteAsync(buf.AsMemory(0, n), ct).ConfigureAwait(false);
+                            read += n;
+                            if (total > 0)
+                                progress?.Report(Math.Clamp((double)read / total, 0, 1));
+                        }
+                        downloaded = true;
+                        break;
+                    }
+                    catch (Exception ex) { lastError = ex; }
                 }
             }
 
             if (!downloaded)
                 throw lastError ?? new InvalidOperationException("Не удалось скачать обновление.");
+
             Directory.CreateDirectory(stageDir);
 
             using (var zipStream = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read))

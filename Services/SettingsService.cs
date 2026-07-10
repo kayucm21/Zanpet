@@ -7,7 +7,7 @@ namespace ZapretUI.Services;
 public sealed class AppSettings
 {
     /// <summary>Schema version for future migrations. Bump when adding/removing fields.</summary>
-    public int SettingsVersion { get; set; } = 4;
+    public int SettingsVersion { get; set; } = 12;
 
     public string? ActivePresetName { get; set; }
     public string? ActiveHostlist { get; set; }
@@ -37,14 +37,44 @@ public sealed class AppSettings
     /// <summary>Theme mode: "dark" (default) or "light".</summary>
     public string Theme { get; set; } = "dark";
 
-    /// <summary>Silent MTProto bridge for Telegram Desktop (tg-ws-proxy, no browser).</summary>
+    /// <summary>Auto-start tg-ws-proxy MTProto bridge with bypass (does not launch Telegram.exe).</summary>
     public bool TelegramWsProxy { get; set; } = true;
 
     /// <summary>Write Windows hosts entries for discord.com (Cloudflare edge pin).</summary>
     public bool DiscordWebHosts { get; set; } = true;
 
+    /// <summary>Auto-find and launch Discord Desktop after bypass (hosts + winws). Manual only by default.</summary>
+    public bool DiscordDesktopAutoLaunch { get; set; } = false;
+
+    /// <summary>Geo bridge for Discord shop/Nitro — part of bypass strategy (SOCKS for Discord only).</summary>
+    public bool DiscordShopBridge { get; set; } = true;
+
+    /// <summary>Only when user manually connects full VPN tab.</summary>
+    public bool DiscordShopVpnBridge { get; set; } = false;
+
+    /// <summary>Deprecated — never auto-start full VPN with bypass.</summary>
+    public bool DiscordShopAutoVpn { get; set; } = false;
+
     /// <summary>Write Windows hosts for Telegram web + desktop (DC pin, like Discord hosts).</summary>
     public bool TelegramWebHosts { get; set; } = true;
+
+    /// <summary>Hosts pin for TikTok CDN (DPI bridge, no app auto-launch).</summary>
+    public bool TikTokWebHosts { get; set; } = true;
+
+    /// <summary>Hosts pin for Instagram/Meta CDN.</summary>
+    public bool InstagramWebHosts { get; set; } = true;
+
+    /// <summary>Hosts pin for WhatsApp web/API.</summary>
+    public bool WhatsAppWebHosts { get; set; } = true;
+
+    /// <summary>Use FTP server for app updates (primary source).</summary>
+    public bool FtpUpdateEnabled { get; set; } = true;
+    public string FtpUpdateHost { get; set; } = "";
+    public int FtpUpdatePort { get; set; } = 21;
+    public bool FtpUpdateUseSsl { get; set; }
+    public string FtpUpdateUser { get; set; } = "";
+    public string FtpUpdatePassword { get; set; } = "";
+    public string FtpUpdatePath { get; set; } = "/updates";
 
     /// <summary>Fixed MTProto secret for tg-ws-proxy (exactly 32 hex chars).</summary>
     public string TelegramWsProxySecret { get; set; } = "eecb9b9a39b6f0d6e8c4a2b1f0d3e7a0";
@@ -72,6 +102,52 @@ public sealed class AppSettings
                 || !TelegramWsProxySecret.Trim().All(Uri.IsHexDigit))
                 TelegramWsProxySecret = "eecb9b9a39b6f0d6e8c4a2b1f0d3e7a0";
             SettingsVersion = 4;
+        }
+        if (SettingsVersion < 5)
+        {
+            DiscordDesktopAutoLaunch = true;
+            SettingsVersion = 5;
+        }
+        if (SettingsVersion < 6)
+        {
+            DiscordShopVpnBridge = false;
+            DiscordShopAutoVpn = false;
+            SettingsVersion = 6;
+        }
+        if (SettingsVersion < 7)
+        {
+            DiscordShopVpnBridge = false;
+            DiscordShopAutoVpn = false;
+            SettingsVersion = 7;
+        }
+        if (SettingsVersion < 8)
+        {
+            DiscordShopBridge = true;
+            SettingsVersion = 8;
+        }
+        if (SettingsVersion < 9)
+        {
+            TikTokWebHosts = true;
+            InstagramWebHosts = true;
+            WhatsAppWebHosts = true;
+            SettingsVersion = 9;
+        }
+        if (SettingsVersion < 10)
+        {
+            DiscordDesktopAutoLaunch = false;
+            TelegramWsProxy = false;
+            SettingsVersion = 10;
+        }
+        if (SettingsVersion < 11)
+        {
+            TelegramWsProxy = true;
+            DiscordDesktopAutoLaunch = false;
+            SettingsVersion = 11;
+        }
+        if (SettingsVersion < 12)
+        {
+            FtpUpdateEnabled = true;
+            SettingsVersion = 12;
         }
         return this;
     }

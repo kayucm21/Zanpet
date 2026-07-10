@@ -78,7 +78,12 @@ public sealed class HostlistService
     }
 
     /// <summary>The bundled "authored" lists, kept in sync with the code below.</summary>
-    public static readonly string[] BundledListNames = { "youtube", "discord", "telegram", "exclude", "general" };
+    public static readonly string[] BundledListNames =
+    {
+        "youtube", "discord", "discord-shop", "telegram",
+        "tiktok", "tiktok-web", "tiktok-upload", "instagram", "facebook", "whatsapp", "whatsapp-web",
+        "exclude", "general",
+    };
 
     /// <summary>Re-sync the bundled lists from code on EVERY launch, so domain updates reach existing
     /// installs (the user shouldn't be stuck on an old 4-host version). These are app-managed;
@@ -87,13 +92,26 @@ public sealed class HostlistService
     {
         Write("youtube", string.Join('\n', DefaultYoutube));
         Write("discord", string.Join('\n', DefaultDiscord));
+        Write("discord-shop", string.Join('\n', DefaultDiscordShop));
         Write("telegram", string.Join('\n', DefaultTelegram));
+        Write("tiktok", string.Join('\n', DefaultTiktok));
+        Write("tiktok-web", string.Join('\n', DefaultTiktokWeb));
+        Write("tiktok-upload", string.Join('\n', DefaultTiktokUpload));
+        Write("instagram", string.Join('\n', DefaultInstagram));
+        Write("facebook", string.Join('\n', DefaultFacebook));
+        Write("whatsapp", string.Join('\n', DefaultWhatsapp));
+        Write("whatsapp-web", string.Join('\n', DefaultWhatsappWeb));
         Write("exclude",  string.Join('\n', DefaultExclude));
         Write("general",  string.Join('\n', DefaultGeneral));
         WriteIpset("telegram", string.Join('\n', DefaultTelegramIpset));
         WriteIpset("telegram-bypass", string.Join('\n', DefaultTelegramBypassIpset));
         SeedBundledIpset("discord");
         SeedBundledIpset("youtube");
+        SeedBundledIpset("instagram");
+        SeedBundledIpset("facebook");
+        SeedBundledIpset("whatsapp");
+        SeedBundledIpset("tiktok");
+        SeedBundledIpset("cloudflare");
     }
 
     private static void SeedBundledIpset(string name)
@@ -140,6 +158,20 @@ public sealed class HostlistService
         // (challenges.cloudflare.com). In allow-list mode it wasn't desynced by anything, so the
         // challenge couldn't render → login stuck on net::ERR_CONNECTION_RESET. Ride the Discord desync.
         "challenges.cloudflare.com",
+        "discordapp.io", "discord.st", "dis.gd",
+    };
+
+    /// <summary>Discord Shop / Nitro / billing checkout (Stripe, PayPal, Google Pay).
+    /// Separate list so payment CDNs get instant first-packet desync without widening the main discord list.</summary>
+    private static readonly string[] DefaultDiscordShop =
+    {
+        "discord.store", "discord.gift", "discord.gifts", "discordmerch.com",
+        "stripe.com", "js.stripe.com", "api.stripe.com", "checkout.stripe.com",
+        "m.stripe.com", "hooks.stripe.com", "r.stripe.com", "q.stripe.com",
+        "b.stripe.com", "merchant-ui-api.stripe.com",
+        "paypal.com", "www.paypal.com", "pay.google.com",
+        "secure.xsolla.com", "api.xsolla.com", "static.xsolla.com",
+        "challenges.cloudflare.com", "cloudflare-ech.com",
     };
 
     /// <summary>Telegram-owned SNI domains (curated). zapret matches subdomains, so apex covers
@@ -162,6 +194,82 @@ public sealed class HostlistService
         "tg.dev", "tg.org", "tgram.org", "torg.org", "telegramapp.org",
         "cdn-telegram.org", "telegram-cdn.org", "tdesktop.com",
         "telegram.space", "telega.one", "telegram.dog", "telegramusercontent.com",
+    };
+
+    /// <summary>TikTok video feed + CDN (ByteDance).</summary>
+    private static readonly string[] DefaultTiktok =
+    {
+        "tiktok.com", "www.tiktok.com", "m.tiktok.com", "vm.tiktok.com",
+        "tiktokv.com", "tiktokcdn.com", "muscdn.com", "musical.ly",
+        "byteoversea.com", "ibytedtos.com", "ibyteimg.com", "ttwstatic.com",
+        "tiktokv.eu", "tiktokw.eu", "tiktokcdn-eu.com", "tiktokglobalshop.com",
+        "mon.tiktokv.com", "libraweb.tiktok.com", "login-no1a.www.tiktok.com",
+        "sf16-website-login.neutral.ttwstatic.com", "sf16-website.neutral.ttwstatic.com",
+        "v16-webapp-prime.tiktok.com", "v19-webapp-prime.tiktok.com",
+        "p16-tiktokcdn-com.akamaized.net", "challenges.cloudflare.com",
+    };
+
+    /// <summary>TikTok web app — instant bypass target (browser).</summary>
+    private static readonly string[] DefaultTiktokWeb =
+    {
+        "www.tiktok.com", "tiktok.com", "m.tiktok.com",
+        "libraweb.tiktok.com", "ttwstatic.com",
+        "sf16-website-login.neutral.ttwstatic.com", "sf16-website.neutral.ttwstatic.com",
+        "mon.tiktokv.com", "ibytedtos.com", "ibyteimg.com",
+        "challenges.cloudflare.com",
+    };
+
+    /// <summary>TikTok Studio / web upload (v16-up, api16-va, open-upload).</summary>
+    private static readonly string[] DefaultTiktokUpload =
+    {
+        "tiktokv.com", "api.tiktokv.com", "api16-va.tiktokv.com", "api19-va.tiktokv.com",
+        "api-h2.tiktokv.com", "api-core-va.tiktokv.com", "api2-16-h2.musical.ly",
+        "v16.tiktokv.com", "v16-up.tiktokv.com", "v19.tiktokv.com", "v16.tiktokcdn.com",
+        "v19.tiktokcdn.com", "sf16-upload.tiktokcdn.com", "p16-tiktokcdn-com.akamaized.net",
+        "open-upload.tiktokapis.com", "open.tiktokapis.com", "tiktokapis.com",
+        "va-tiktok.byteoversea.com", "abtest-va-tiktok.byteoversea.com",
+        "v16-up.amemv.com", "amemv.com", "log.tiktokv.com", "mon.tiktokv.com",
+        "gecko-va.tiktokv.com", "dm16.tiktokv.com",
+    };
+
+    /// <summary>Instagram + Meta login/CDN.</summary>
+    private static readonly string[] DefaultInstagram =
+    {
+        "instagram.com", "www.instagram.com", "cdninstagram.com", "ig.me",
+        "i.instagram.com", "graph.instagram.com", "help.instagram.com",
+    };
+
+    /// <summary>Facebook / Meta login (WhatsApp Web QR).</summary>
+    private static readonly string[] DefaultFacebook =
+    {
+        "facebook.com", "www.facebook.com", "fbcdn.net", "fb.com", "fbsbx.com", "fburl.com",
+        "graph.facebook.com", "connect.facebook.net", "m.facebook.com",
+        "edge-chat.facebook.com", "star.fallback.c10r.facebook.com",
+        "challenges.cloudflare.com",
+    };
+
+    /// <summary>WhatsApp web + mobile API.</summary>
+    private static readonly string[] DefaultWhatsapp =
+    {
+        "whatsapp.com", "www.whatsapp.com", "web.whatsapp.com", "api.whatsapp.com",
+        "whatsapp.net", "whatsapp.co", "wa.me", "wl.co", "whatsappbrand.com",
+        "static.whatsapp.net", "mmg.whatsapp.net", "g.whatsapp.net", "v.whatsapp.net",
+        "dyn.web.whatsapp.com", "graph.whatsapp.com", "pps.whatsapp.net",
+        "media-fra3-1.cdn.whatsapp.net", "media-ams2-1.cdn.whatsapp.net",
+        "media-fra3-2.cdn.whatsapp.net", "media-lhr6-1.cdn.whatsapp.net",
+        "media-lhr8-1.cdn.whatsapp.net", "media-sin6-1.cdn.whatsapp.net",
+        "challenges.cloudflare.com",
+    };
+
+    /// <summary>WhatsApp Web client — QR, websocket, static (NSDI/DNS poison fix via hosts+winws).</summary>
+    private static readonly string[] DefaultWhatsappWeb =
+    {
+        "web.whatsapp.com", "www.web.whatsapp.com", "www.whatsapp.com",
+        "static.whatsapp.net", "mmg.whatsapp.net", "g.whatsapp.net", "v.whatsapp.net",
+        "dyn.web.whatsapp.com", "graph.whatsapp.com", "pps.whatsapp.net",
+        "graph.facebook.com", "connect.facebook.net", "m.facebook.com",
+        "edge-chat.facebook.com", "star.fallback.c10r.facebook.com",
+        "challenges.cloudflare.com",
     };
 
     /// <summary>Official Telegram DC CIDRs (core.telegram.org/resources/cidr.txt) + IPv6.</summary>

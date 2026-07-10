@@ -63,9 +63,20 @@ public sealed class Preset
 
             if (key == "telegram" && a.Contains("telegram.org", StringComparison.OrdinalIgnoreCase))
                 return true;
-            if (key == "discord" && a.Contains("discord.gg", StringComparison.OrdinalIgnoreCase))
+            if (key == "discord" && (a.Contains("discord.gg", StringComparison.OrdinalIgnoreCase)
+                || a.Contains("discord.com", StringComparison.OrdinalIgnoreCase)
+                || a.Contains("discord-shop", StringComparison.OrdinalIgnoreCase)))
                 return true;
             if (key == "youtube" && a.Contains("googlevideo.com", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (key == "whatsapp" && (a.Contains("whatsapp.com", StringComparison.OrdinalIgnoreCase)
+                || a.Contains("whatsapp-web", StringComparison.OrdinalIgnoreCase)))
+                return true;
+            if (key == "tiktok" && (a.Contains("tiktok.com", StringComparison.OrdinalIgnoreCase)
+                || a.Contains("tiktok-web", StringComparison.OrdinalIgnoreCase)
+                || a.Contains("tiktok-upload", StringComparison.OrdinalIgnoreCase)))
+                return true;
+            if (key == "instagram" && a.Contains("instagram.com", StringComparison.OrdinalIgnoreCase))
                 return true;
         }
         return false;

@@ -109,30 +109,30 @@ public sealed class PresetService
     {
         Combo(
             name: "YouTube + Discord + Telegram",
-            description: "Рекомендуемая стратегия: YouTube, Discord (войс/_MEDIA), Telegram и остальной TLS/QUIC. Настройте «Область обхода» и «Игровой фильтр» в Настройках.",
+            description: "Рекомендуемая стратегия: YouTube, Discord, Telegram, TikTok, Instagram, WhatsApp и остальной TLS/QUIC. Настройте «Область обхода» и «Игровой фильтр» в Настройках.",
             recommended: true
         ),
         Combo(
             name: "Multidisorder Advanced",
-            description: "YouTube, Discord, Telegram + продвинутый multidisorder/multisplit для остального TLS. Для агрессивных DPI.",
+            description: "YouTube, Discord, Telegram, TikTok, Instagram, WhatsApp + продвинутый multidisorder/multisplit для остального TLS. Для агрессивных DPI.",
             recommended: false,
             buildArgs: BuildMultidisorderArgs
         ),
         Combo(
             name: "FakeSplit Pro",
-            description: "YouTube, Discord, Telegram + fakedsplit/fakeddisorder для остального TLS. Двойное искажение пакетов.",
+            description: "YouTube, Discord, Telegram, TikTok, Instagram, WhatsApp + fakedsplit/fakeddisorder для остального TLS. Двойное искажение пакетов.",
             recommended: false,
             buildArgs: BuildFakeSplitArgs
         ),
         Combo(
             name: "TCP Segmentation",
-            description: "YouTube, Discord, Telegram + tcpseg для остального TLS. Сегментация с seqovl.",
+            description: "YouTube, Discord, Telegram, TikTok, Instagram, WhatsApp + tcpseg для остального TLS. Сегментация с seqovl.",
             recommended: false,
             buildArgs: BuildTcpSegArgs
         ),
         Combo(
             name: "OOB Injection",
-            description: "YouTube, Discord, Telegram + OOB injection для остального TLS. URG-флаг в потоке.",
+            description: "YouTube, Discord, Telegram, TikTok, Instagram, WhatsApp + OOB injection для остального TLS. URG-флаг в потоке.",
             recommended: false,
             buildArgs: BuildOobArgs
         ),
@@ -184,13 +184,220 @@ public sealed class PresetService
         "--lua-desync=tls_multisplit_sni:seqovl=652:seqovl_pattern=tls_google",
     ];
 
-    /// <summary>YouTube → Discord → Telegram (web + desktop MTProto first).</summary>
+    /// <summary>Flowseal hostfakesplit — works well for Meta/WhatsApp/TikTok web.</summary>
+    private static readonly string[] HostFakeSplit =
+    [
+        "--lua-desync=send:repeats=2",
+        "--lua-desync=syndata:blob=tls_google",
+        "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=3",
+    ];
+
+    /// <summary>Flowseal fake+fakedsplit chain for Meta ipsets (WhatsApp desktop/web).</summary>
+    private static readonly string[] FlowsealMetaFake =
+    [
+        "--lua-desync=fake:blob=tls_google:repeats=6:tcp_ts=-600000",
+        "--lua-desync=fakedsplit:pattern=0x00:repeats=6:tcp_ts=-600000",
+    ];
+
+    private const string TikTokUploadDomains =
+        "v16-up.tiktokv.com,api16-va.tiktokv.com,api19-va.tiktokv.com,api.tiktokv.com,api-h2.tiktokv.com,api-core-va.tiktokv.com," +
+        "v16.tiktokcdn.com,v19.tiktokcdn.com,sf16-upload.tiktokcdn.com,open-upload.tiktokapis.com,open.tiktokapis.com," +
+        "p16-tiktokcdn-com.akamaized.net,v16-up.amemv.com,gecko-va.tiktokv.com,dm16.tiktokv.com,log.tiktokv.com";
+
+    private const string WhatsAppWebDomains =
+        "web.whatsapp.com,www.web.whatsapp.com,static.whatsapp.net,mmg.whatsapp.net,g.whatsapp.net,v.whatsapp.net," +
+        "dyn.web.whatsapp.com,graph.whatsapp.com,pps.whatsapp.net,edge-chat.facebook.com,star.fallback.c10r.facebook.com";
+
+    /// <summary>Social web FIRST → Discord → rest.</summary>
     private static void AppendServiceProfiles(List<string> a)
     {
-        AppendTelegramDesktopProfiles(a, firstSegment: true);
-        AppendYoutubeProfiles(a, firstSegment: false);
+        AppendSocialWebBridgeProfiles(a, firstSegment: true);
         AppendDiscordProfiles(a, firstSegment: false);
+        AppendWhatsappProfiles(a, firstSegment: false);
+        AppendTiktokProfiles(a, firstSegment: false);
+        AppendYoutubeProfiles(a, firstSegment: false);
+        AppendInstagramProfiles(a, firstSegment: false);
+        AppendTelegramDesktopProfiles(a, firstSegment: false);
         AppendTelegramWebProfiles(a, firstSegment: false);
+    }
+
+    /// <summary>WhatsApp Web + TikTok Web — highest priority (before Discord).</summary>
+    private static void AppendSocialWebBridgeProfiles(List<string> a, bool firstSegment)
+    {
+        void Next()
+        {
+            if (!firstSegment) a.Add("--new");
+            firstSegment = false;
+        }
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            $"--hostlist-domains={WhatsAppWebDomains}",
+            "--payload=all",
+            "--out-range=-d2",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{HOSTLIST:whatsapp-web}",
+            "--payload=all",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{HOSTLIST:whatsapp-web}",
+            "--payload=all",
+            "--out-range=-d10",
+        });
+        a.AddRange(HostFakeSplit);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,444-65535",
+            $"--hostlist-domains={TikTokUploadDomains}",
+            "--payload=all",
+            "--out-range=-d2",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,444-65535",
+            $"--hostlist-domains={TikTokUploadDomains}",
+            "--payload=all",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,444-65535",
+            "{HOSTLIST:tiktok-upload}",
+            "--payload=all",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,444-65535",
+            "{HOSTLIST:tiktok-upload}",
+            "--payload=all",
+            "--out-range=-d10",
+        });
+        a.AddRange(HostFakeSplit);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,444-65535",
+            "{HOSTLIST:tiktok-upload}",
+            "--payload=all",
+            "--out-range=-d10",
+        });
+        a.AddRange(FlowsealMetaFake);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,444-65535",
+            "{IPSET:tiktok}",
+            "{HOSTLIST:tiktok-upload}",
+            "--payload=all",
+            "--out-range=-d10",
+        });
+        a.AddRange(FlowsealMetaFake);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "--hostlist-domains=www.tiktok.com,tiktok.com,m.tiktok.com,libraweb.tiktok.com,ttwstatic.com,sf16-website-login.neutral.ttwstatic.com",
+            "--payload=all",
+            "--out-range=-d2",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{HOSTLIST:tiktok-web}",
+            "--payload=all",
+            "--out-range=-d10",
+        });
+        a.AddRange(HostFakeSplit);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
+            "{HOSTLIST:whatsapp}",
+            "{HOSTLIST:facebook}",
+            "{HOSTLIST:instagram}",
+            "--payload=all",
+            "--out-range=-d10",
+        });
+        a.AddRange(HostFakeSplit);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,5222",
+            "{IPSET:facebook}",
+            "{IPSET:whatsapp}",
+            "{IPSET:instagram}",
+            "--payload=all",
+            "--out-range=-d10",
+        });
+        a.AddRange(FlowsealMetaFake);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{IPSET:cloudflare}",
+            "{HOSTLIST:tiktok}",
+            "--payload=all",
+            "--out-range=-d10",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-udp=443,3478,5222,5349,59234-59242",
+            "{IPSET:whatsapp}",
+            "{IPSET:facebook}",
+            "--out-range=-n8",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=12:payload=all",
+        });
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-udp=1024-65535",
+            "{IPSET:whatsapp}",
+            "{IPSET:facebook}",
+            "--out-range=-n8",
+            "--payload=all",
+            "--lua-desync=fake:blob=stun_pat:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=8",
+            "--lua-desync=fake:blob=quic2:repeats=8",
+        });
     }
 
     private static void AppendYoutubeProfiles(List<string> a, bool firstSegment)
@@ -238,41 +445,61 @@ public sealed class PresetService
             firstSegment = false;
         }
 
+        // Gateway + CDN — мгновенная загрузка клиента (полная цепочка FastTls, 4 первых пакета).
         Next();
         a.AddRange(new[]
         {
             "--filter-tcp=443",
-            "--hostlist-domains=updates.discord.com,gateway.discord.gg,remote-auth-gateway.discord.gg",
-            "--out-range=-d2",
+            "--hostlist-domains=gateway.discord.gg,remote-auth-gateway.discord.gg,updates.discord.com,cdn.discordapp.com,media.discordapp.net,images-ext-1.discordapp.net,discordapp.com,discordapp.net,discordcdn.com,discord.media,latency.discord.media",
+            "--out-range=-n4",
         });
-        a.AddRange(FastTlsDiscordOnly);
+        a.AddRange(FastTls);
+
+        // Shop / Nitro / billing — Stripe checkout iframe.
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "--hostlist-domains=discord.com,www.discord.com,discord.store,discord.gift,discord.gifts,discordmerch.com",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "{HOSTLIST:discord-shop}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
 
         Next();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
             "--hostlist-domains=discord.media,cdn.discordapp.com,media.discordapp.net",
-            "--out-range=-d2",
+            "--out-range=-n4",
         });
-        a.AddRange(FastTlsDiscordOnly);
+        a.AddRange(FastTls);
 
         Next();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
             "{HOSTLIST:discord}",
-            "--out-range=-n2",
+            "--out-range=-n4",
         });
-        a.AddRange(FastTlsDiscordOnly);
+        a.AddRange(FastTls);
 
         Next();
         a.AddRange(new[]
         {
             "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443",
             "{IPSET:discord}",
-            "--out-range=-n2",
+            "--out-range=-n4",
         });
-        a.AddRange(FastTlsDiscordOnly);
+        a.AddRange(FastTls);
 
         Next();
         a.AddRange(new[]
@@ -303,6 +530,318 @@ public sealed class PresetService
             "--payload=all",
             "--lua-desync=fake:blob=stun_pat:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=2",
             "--lua-desync=fake:blob=quic2:repeats=4",
+        });
+    }
+
+    private static void AppendTiktokProfiles(List<string> a, bool firstSegment)
+    {
+        void Next()
+        {
+            if (!firstSegment) a.Add("--new");
+            firstSegment = false;
+        }
+
+        // TikTok upload API — instant (Discord gateway style, 4 passes).
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,444-65535",
+            $"--hostlist-domains={TikTokUploadDomains}",
+            "--payload=all",
+            "--out-range=-d2",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,444-65535",
+            $"--hostlist-domains={TikTokUploadDomains}",
+            "--payload=all",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,444-65535",
+            "{HOSTLIST:tiktok-upload}",
+            "--payload=all",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,444-65535",
+            "{HOSTLIST:tiktok-upload}",
+            "--payload=all",
+            "--out-range=-d10",
+        });
+        a.AddRange(HostFakeSplit);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,2053,2083,2087,2096,8443",
+            "{HOSTLIST:tiktok-upload}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,444-65535",
+            "{IPSET:tiktok}",
+            "{HOSTLIST:tiktok-upload}",
+            "--payload=all",
+            "--out-range=-d10",
+        });
+        a.AddRange(FlowsealMetaFake);
+
+        // TikTok web — instant (как gateway Discord).
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "--hostlist-domains=www.tiktok.com,tiktok.com,libraweb.tiktok.com,ttwstatic.com,sf16-website-login.neutral.ttwstatic.com",
+            "--out-range=-d2",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "{HOSTLIST:tiktok-web}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,2053,2083,2087,2096,8443",
+            "--hostlist-domains=tiktok.com,tiktokcdn.com,tiktokv.com,muscdn.com,byteoversea.com,ibytedtos.com,ibyteimg.com",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,2053,2083,2087,2096,8443",
+            "{HOSTLIST:tiktok}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{IPSET:tiktok}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-udp=443",
+            "{HOSTLIST:tiktok-upload}",
+            "--out-range=-n8",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=12:payload=all",
+        });
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-udp=443",
+            "{HOSTLIST:tiktok}",
+            "--out-range=-n8",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all",
+        });
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-udp=443",
+            "{IPSET:tiktok}",
+            "--out-range=-n8",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all",
+            "--lua-desync=udplen:increment=5:pattern=0xDEADBEEF",
+        });
+    }
+
+    private static void AppendInstagramProfiles(List<string> a, bool firstSegment)
+    {
+        void Next()
+        {
+            if (!firstSegment) a.Add("--new");
+            firstSegment = false;
+        }
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "--hostlist-domains=instagram.com,cdninstagram.com,facebook.com,fbcdn.net",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{HOSTLIST:instagram}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{IPSET:instagram}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-udp=443",
+            "{IPSET:instagram}",
+            "--out-range=-n8",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=6:payload=all",
+        });
+    }
+
+    private static void AppendWhatsappProfiles(List<string> a, bool firstSegment)
+    {
+        void Next()
+        {
+            if (!firstSegment) a.Add("--new");
+            firstSegment = false;
+        }
+
+        // WhatsApp Web — instant (Discord gateway style).
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            $"--hostlist-domains={WhatsAppWebDomains}",
+            "--out-range=-d2",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            $"--hostlist-domains={WhatsAppWebDomains}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443",
+            "{HOSTLIST:whatsapp-web}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,5222",
+            "{HOSTLIST:whatsapp-web}",
+            "--payload=all",
+            "--out-range=-d10",
+        });
+        a.AddRange(HostFakeSplit);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,5222",
+            "--hostlist-domains=whatsapp.com,whatsapp.net,graph.whatsapp.com,graph.facebook.com,connect.facebook.net,edge-chat.facebook.com",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443,5222",
+            "{HOSTLIST:whatsapp}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        // Desktop/mobile — ipset + TLS fallback chain (как Telegram MTProto).
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443,5222",
+            "{IPSET:whatsapp}",
+            "--payload=all",
+            "--out-range=-n8",
+            "--lua-desync=send:repeats=1",
+            "--lua-desync=syndata:blob=tls_google",
+            "--lua-desync=tls_multisplit_sni:seqovl=652:seqovl_pattern=tls_google",
+        });
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443,5222",
+            "{IPSET:whatsapp}",
+            "--payload=all",
+            "--out-range=-n8",
+            "--lua-desync=fake:blob=tls_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=6",
+        });
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=443,5222",
+            "{IPSET:whatsapp}",
+            "--payload=all",
+            "--out-range=-n8",
+            "--lua-desync=fakedsplit:pos=1:blob=tls_google:ip_autottl=-3,3-20:ip6_autottl=-3,3-20:repeats=2",
+        });
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-udp=443,3478,5222,5349,59234-59242",
+            "{IPSET:whatsapp}",
+            "--out-range=-n8",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all",
+        });
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-udp=1024-65535",
+            "{IPSET:whatsapp}",
+            "--out-range=-n8",
+            "--payload=all",
+            "--lua-desync=fake:blob=stun_pat:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=6",
+            "--lua-desync=fake:blob=quic2:repeats=6",
         });
     }
 
