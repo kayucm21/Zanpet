@@ -498,9 +498,24 @@ public sealed class MainViewModel : ObservableObject
         if (launchedAfterUpdate)
         {
             _updater.ClearUpdateCooldown();
-            string? marker = AppUpdateInstaller.ReadInstalledVersionMarker(AppUpdateInstaller.GetInstallDirectory());
+            string installDir = AppUpdateInstaller.GetInstallDirectory();
+            string? marker = AppUpdateInstaller.ReadInstalledVersionMarker(installDir);
             AppendLog($"Обновление установлено: v{UpdaterService.AppVersion}" +
-                      (marker is not null ? $" (файлы: {marker})" : ""));
+                      (marker is not null ? $" (маркер: {marker})" : ""));
+            if (marker is not null && marker != UpdaterService.AppVersion)
+                AppendLog($"Внимание: маркер ({marker}) не совпадает с версией exe ({UpdaterService.AppVersion}).");
+        }
+
+        else
+        {
+            string? failedLog = AppUpdateInstaller.ReadLastUpdateLogTail();
+            if (failedLog is not null && failedLog.Contains("FAILED", StringComparison.OrdinalIgnoreCase))
+            {
+                AppendLog("Прошлое обновление не завершилось. Лог:");
+                foreach (var line in failedLog.Split('\n'))
+                    if (!string.IsNullOrWhiteSpace(line))
+                        AppendLog(line.Trim());
+            }
         }
 
         // Copy engine binaries + data from ClassicData FIRST so the engine
@@ -571,11 +586,11 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Надёжное обновление (2.7.x → новые)
-Полная замена файлов (/MIR), удаление старых DLL, исправление zip.
+        return @"✦ Обновление с любой версии (2.7.x+)
+Полная замена файлов, удаление старых DLL/exe, лог в logs\update.log.
 
-✦ Обновления FTP + GitHub
-Версии с FTP и GitHub в настройках.
+✦ FTP + GitHub
+Версии в настройках. Установка с FTP или GitHub.
 
 ✦ Telegram / Discord
 Мост Telegram автозапуск. Discord и Telegram.exe — вручную.";
