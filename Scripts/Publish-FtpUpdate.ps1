@@ -35,7 +35,7 @@ $manifest = @{
     tag     = "v$Version"
     build   = 2
     file    = $fileName
-    notes   = "v2.9.12: fix YouTube for all users — merged googlevideo ipset, expanded domains, multidisorder profile"
+    notes   = "v2.9.12: fix YouTube - merged googlevideo ipset, expanded domains, multidisorder profile"
 } | ConvertTo-Json -Compress
 
 $manifestPath = Join-Path $env:TEMP "update.json"
