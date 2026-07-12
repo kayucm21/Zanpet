@@ -33,9 +33,9 @@ if ($zipVersion -and $zipVersion -ne $Version) {
 $manifest = @{
     version = $Version
     tag     = "v$Version"
-    build   = 5
+    build   = 6
     file    = $fileName
-    notes   = "v2.9.14: fix WinDivert64.sys locked on startup, safe engine file copy"
+    notes   = "v2.9.15: strengthen Firefox YouTube - InnerTube API, fake+fakedsplit, QUIC x12"
 } | ConvertTo-Json -Compress
 
 $manifestPath = Join-Path $env:TEMP "update.json"

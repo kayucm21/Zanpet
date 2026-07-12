@@ -210,10 +210,20 @@ public sealed class PresetService
 
     /// <summary>YouTube player/static CDN — Firefox loads these before googlevideo (blocked without early desync).</summary>
     private const string YoutubeCdnDomains =
-        "gstatic.com,www.gstatic.com,googleapis.com,fonts.googleapis.com,fonts.gstatic.com," +
-        "redirector.googlevideo.com,googleusercontent.com,ajax.googleapis.com";
+        "gstatic.com,www.gstatic.com,ssl.gstatic.com,googleapis.com,youtubei.googleapis.com,youtube.googleapis.com," +
+        "fonts.googleapis.com,fonts.gstatic.com,redirector.googlevideo.com,googleusercontent.com,ajax.googleapis.com," +
+        "i.ytimg.com,s.ytimg.com,ytimg.com,ggpht.com";
 
-    /// <summary>Mozilla/Firefox browser + addons (separate from YouTube CDN).</summary>
+    /// <summary>Firefox YouTube shell + InnerTube API (page load fails if these are reset).</summary>
+    private const string YoutubeWebDomains =
+        "www.youtube.com,youtube.com,m.youtube.com,music.youtube.com,youtubei.googleapis.com,youtube.googleapis.com";
+
+    /// <summary>Flowseal fake+fakedsplit — Firefox googlevideo TLS often needs this beyond multisplit.</summary>
+    private static readonly string[] YoutubeFlowsealFake =
+    [
+        "--lua-desync=fake:blob=tls_google:repeats=6:tcp_ts=-600000",
+        "--lua-desync=fakedsplit:pattern=0x00:repeats=6:tcp_ts=-600000",
+    ];
     private const string FirefoxDomains =
         "firefox.com,www.firefox.com,mozilla.org,www.mozilla.org,mozilla.net,mozilla.com," +
         "addons.mozilla.org,aus5.mozilla.org,detectportal.firefox.com,push.services.mozilla.com," +
@@ -420,7 +430,17 @@ public sealed class PresetService
             firstSegment = false;
         }
 
-        // gstatic/googleapis — Firefox player JS/CSS (loads before video segments).
+        // Firefox InnerTube API — must desync first ClientHello or player never starts.
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            $"--hostlist-domains={YoutubeWebDomains}",
+            "--out-range=-d2",
+        });
+        a.AddRange(FastTls);
+
+        // gstatic/googleapis/ytimg — Firefox player JS/CSS (loads before video segments).
         Next();
         a.AddRange(new[]
         {
@@ -441,6 +461,16 @@ public sealed class PresetService
             "--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1:seqovl_pattern=tls_google",
         });
 
+        // Firefox page shell — hostfakesplit works where multisplit alone fails.
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            $"--hostlist-domains={YoutubeWebDomains}",
+            "--out-range=-d10",
+        });
+        a.AddRange(HostFakeSplit);
+
         Next();
         a.AddRange(new[]
         {
@@ -460,6 +490,16 @@ public sealed class PresetService
             "--lua-desync=syndata:blob=tls_google",
             "--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1:seqovl_pattern=tls_google",
         });
+
+        // googlevideo TLS — Flowseal fake+fakedsplit (Firefox video redirect handshake).
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "--hostlist-domains=googlevideo.com",
+            "--out-range=-d8",
+        });
+        a.AddRange(YoutubeFlowsealFake);
 
         Next();
         a.AddRange(new[]
@@ -473,11 +513,31 @@ public sealed class PresetService
         Next();
         a.AddRange(new[]
         {
+            "--filter-tcp=80,443",
+            "{HOSTLIST:youtube}",
+            "--out-range=-d10",
+        });
+        a.AddRange(HostFakeSplit);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{HOSTLIST:youtube}",
+            "--out-range=-d8",
+        });
+        a.AddRange(YoutubeFlowsealFake);
+
+        // Firefox HTTP/3 — QUIC on 443 (primary).
+        Next();
+        a.AddRange(new[]
+        {
             "--filter-udp=443",
             "{IPSET:youtube}",
             "--out-range=-n8",
             "--payload=all",
-            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=6:payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=12:payload=all",
+            "--lua-desync=fake:blob=quic2:repeats=4:payload=all",
         });
 
         Next();
@@ -487,7 +547,19 @@ public sealed class PresetService
             "{IPSET:googlevideo}",
             "--out-range=-n8",
             "--payload=all",
-            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=8:payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=12:payload=all",
+            "--lua-desync=fake:blob=quic2:repeats=4:payload=all",
+        });
+
+        // Firefox QUIC fallback — some ISPs throttle only high UDP ports for googlevideo.
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-udp=444-65535",
+            "{IPSET:googlevideo}",
+            "--out-range=-n8",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all",
         });
     }
 

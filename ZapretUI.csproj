@@ -13,10 +13,10 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
-    <Version>2.9.14</Version>
-    <AssemblyVersion>2.9.14.0</AssemblyVersion>
-    <FileVersion>2.9.14.0</FileVersion>
-    <InformationalVersion>2.9.14+5</InformationalVersion>
+    <Version>2.9.15</Version>
+    <AssemblyVersion>2.9.15.0</AssemblyVersion>
+    <FileVersion>2.9.15.0</FileVersion>
+    <InformationalVersion>2.9.15+6</InformationalVersion>
     <Product>Zapret UI</Product>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <!-- Self-contained single-file publish so the user needs nothing installed -->

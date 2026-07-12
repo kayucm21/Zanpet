@@ -159,19 +159,21 @@ public sealed class HostlistService
     /// <summary>YouTube/Google domains — full set for site + player + CDN (incl. googlevideo).</summary>
     private static readonly string[] DefaultYoutube =
     [
-        "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "youtubekids.com",
+        "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be", "youtubekids.com",
         "googlevideo.com", "manifest.googlevideo.com", "redirector.googlevideo.com",
         "ggpht.com", "yt3.ggpht.com", "yt4.ggpht.com",
-        "ytimg.com", "ytimg.l.google.com", "gvt1.com", "gvt2.com",
+        "ytimg.com", "i.ytimg.com", "s.ytimg.com", "ytimg.l.google.com", "gvt1.com", "gvt2.com",
         "yt3.googleusercontent.com", "lh3.googleusercontent.com", "googleusercontent.com",
         "youtube-nocookie.com", "youtube-ui.l.google.com", "wide-youtube.l.google.com",
         "yt-video-upload.l.google.com",
         "youtubeembeddedplayer.googleapis.com", "youtube.googleapis.com",
         "youtubei.googleapis.com", "jnn-pa.googleapis.com",
         "googleapis.com", "ajax.googleapis.com", "fonts.googleapis.com",
-        "gstatic.com", "www.gstatic.com", "fonts.gstatic.com",
+        "gstatic.com", "www.gstatic.com", "ssl.gstatic.com", "fonts.gstatic.com",
+        "clients1.google.com", "clients2.google.com", "clients3.google.com",
+        "clients4.google.com", "clients5.google.com", "clients6.google.com",
         "play.google.com", "accounts.google.com", "googleadservices.com",
-        "google.com", "google.ru",
+        "google.com", "www.google.com", "google.ru",
     ];
 
     /// <summary>Mozilla/Firefox — player scripts, addons, connectivity checks (Firefox blocks when DPI resets these).</summary>
