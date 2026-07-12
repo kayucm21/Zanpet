@@ -13,4 +13,6 @@ public sealed record AppReleaseInfo(
     string Tag,
     string DisplayUrl,
     AppReleaseSource Source,
-    string? FtpZipFile = null);
+    string? FtpZipFile = null,
+    int Build = 0,
+    string? Notes = null);

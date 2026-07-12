@@ -106,12 +106,38 @@ public sealed class HostlistService
         WriteIpset("telegram", string.Join('\n', DefaultTelegramIpset));
         WriteIpset("telegram-bypass", string.Join('\n', DefaultTelegramBypassIpset));
         SeedBundledIpset("discord");
-        SeedBundledIpset("youtube");
+        SeedYoutubeIpset();
+        SeedBundledIpset("googlevideo");
         SeedBundledIpset("instagram");
         SeedBundledIpset("facebook");
         SeedBundledIpset("whatsapp");
         SeedBundledIpset("tiktok");
         SeedBundledIpset("cloudflare");
+    }
+
+    private static void SeedYoutubeIpset()
+    {
+        var cidrs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string file in new[] { "ipset-youtube.txt", "ipset-googlevideo.txt" })
+        {
+            string bundled = Path.Combine(AppPaths.ClassicDataDir, "lists", file);
+            if (!File.Exists(bundled)) continue;
+            foreach (string line in File.ReadAllLines(bundled))
+            {
+                string t = line.Trim();
+                if (t.Length > 0 && !t.StartsWith('#'))
+                    cidrs.Add(t);
+            }
+        }
+
+        if (cidrs.Count == 0)
+        {
+            SeedBundledIpset("youtube");
+            return;
+        }
+
+        string merged = string.Join('\n', cidrs.OrderBy(c => c, StringComparer.OrdinalIgnoreCase));
+        File.WriteAllText(AppPaths.IpsetFile("youtube"), NormalizeNewlines(merged));
     }
 
     private static void SeedBundledIpset(string name)
@@ -129,16 +155,21 @@ public sealed class HostlistService
 
     // ---- bundled default lists (synced from Flowseal/zapret-discord-youtube, июнь 2026) ----
 
-    /// <summary>YouTube/Google domains (Flowseal list-google.txt).</summary>
+    /// <summary>YouTube/Google domains — full set for site + player + CDN (incl. googlevideo).</summary>
     private static readonly string[] DefaultYoutube =
-    {
-        "yt3.ggpht.com", "yt4.ggpht.com", "yt3.googleusercontent.com", "googlevideo.com",
-        "jnn-pa.googleapis.com", "stable.dl2.discordapp.net", "wide-youtube.l.google.com",
-        "youtube-nocookie.com", "youtube-ui.l.google.com", "youtube.com",
-        "youtubeembeddedplayer.googleapis.com", "youtubekids.com", "youtube.googleapis.com",
-        "youtubei.googleapis.com", "youtu.be", "yt-video-upload.l.google.com", "ytimg.com",
-        "ytimg.l.google.com", "play.google.com", "google.ru",
-    };
+    [
+        "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "youtubekids.com",
+        "googlevideo.com", "manifest.googlevideo.com",
+        "ggpht.com", "yt3.ggpht.com", "yt4.ggpht.com",
+        "ytimg.com", "ytimg.l.google.com", "gvt1.com",
+        "yt3.googleusercontent.com", "lh3.googleusercontent.com",
+        "youtube-nocookie.com", "youtube-ui.l.google.com", "wide-youtube.l.google.com",
+        "yt-video-upload.l.google.com",
+        "youtubeembeddedplayer.googleapis.com", "youtube.googleapis.com",
+        "youtubei.googleapis.com", "jnn-pa.googleapis.com",
+        "play.google.com", "accounts.google.com", "googleadservices.com",
+        "google.com", "google.ru",
+    ];
 
     /// <summary>Full Discord domain set (Flowseal list-general.txt, Discord entries).
     /// zapret matches subdomains, so the base domains are enough.</summary>

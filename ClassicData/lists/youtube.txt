@@ -1,4 +1,6 @@
 youtube.com
+www.youtube.com
+m.youtube.com
 youtubekids.com
 ggpht.com
 ytimg.com
@@ -8,6 +10,8 @@ googleadservices.com
 lh3.googleusercontent.com
 yt3.googleusercontent.com
 gvt1.com
+googlevideo.com
+manifest.googlevideo.com
 youtube-nocookie.com
 youtubeembeddedplayer.googleapis.com
 youtube.googleapis.com
@@ -19,3 +23,7 @@ wide-youtube.l.google.com
 play.google.com
 accounts.google.com
 ytimg.l.google.com
+yt3.ggpht.com
+yt4.ggpht.com
+google.com
+google.ru

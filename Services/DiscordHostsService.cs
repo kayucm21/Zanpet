@@ -5,7 +5,7 @@ using System.Text;
 namespace ZapretUI.Services;
 
 /// <summary>
-/// Temporary Windows hosts entries for Discord web + desktop login (discord.com).
+/// Temporary Windows hosts entries for Discord web + desktop (gateway, shop, Nitro billing).
 /// ISPs often return poisoned/blocked DNS; pinning to a Cloudflare edge IP is a common fix.
 /// </summary>
 public sealed class DiscordHostsService
@@ -22,11 +22,12 @@ public sealed class DiscordHostsService
         }),
         ("162.159.128.233", new[]
         {
-            "discord.com", "www.discord.com", "discordapp.com", "status.discord.com",
+            "discord.com", "www.discord.com", "discordapp.com", "discordapp.net", "status.discord.com",
             "updates.discord.com",
+            "discord.store", "discord.gift", "discord.gifts", "discordmerch.com",
             "cdn.discordapp.com", "media.discordapp.net", "images-ext-1.discordapp.net",
-            "discord.media", "remote-auth-gateway.discord.gg",
-            "challenges.cloudflare.com",
+            "discordcdn.com", "discord.media", "remote-auth-gateway.discord.gg",
+            "challenges.cloudflare.com", "cloudflare-ech.com",
         }),
     ];
 
@@ -60,7 +61,7 @@ public sealed class DiscordHostsService
             File.WriteAllText(HostsPath, text.TrimEnd() + block.ToString());
             FlushDns();
             IsApplied = true;
-            Emit($"Discord: hosts ({count} доменов, gateway → 162.159.137.232)");
+            Emit($"Discord: hosts ({count} доменов, gateway + CDN + магазин)");
             return true;
         }
         catch (Exception ex)

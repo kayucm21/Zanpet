@@ -78,7 +78,7 @@ public sealed class TargetService
         catch { return new(); }
     }
 
-    public void Save(string name, IEnumerable<string> domains)
+    public void Save(string name, IEnumerable<string> domains, IEnumerable<int>? openPorts = null)
     {
         name = Normalize(name);
         if (name.Length == 0) return;
@@ -87,7 +87,15 @@ public sealed class TargetService
             .Where(d => d.Length > 0 && !d.StartsWith('#'))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
-        File.WriteAllText(PathFor(name), string.Join('\n', clean));
+        var lines = new List<string>();
+        if (openPorts is not null)
+        {
+            var ports = openPorts.Distinct().OrderBy(p => p).ToList();
+            if (ports.Count > 0)
+                lines.Add("# ports=" + string.Join(',', ports));
+        }
+        lines.AddRange(clean);
+        File.WriteAllText(PathFor(name), string.Join('\n', lines));
         WriteAggregate();
     }
 
@@ -122,26 +130,75 @@ public sealed class TargetService
         return s;
     }
 
+    /// <summary>Registrable root: web.whatsapp.com → whatsapp.com.</summary>
+    public static string RegistrableRoot(string host)
+    {
+        host = Normalize(host);
+        var p = host.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        if (p.Length < 2) return host;
+        bool multi = p.Length >= 3 && p[^1].Length == 2 &&
+                     p[^2] is "co" or "com" or "ne" or "or" or "go" or "ac";
+        return multi ? string.Join('.', p[^3..]) : string.Join('.', p[^2], p[^1]);
+    }
+
+    /// <summary>Parallel crt.sh on several roots (fast, best-effort).</summary>
+    public async Task<List<string>> DiscoverCrtAsync(IEnumerable<string> roots, CancellationToken ct)
+    {
+        var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var unique = roots
+            .Select(Normalize)
+            .Where(r => r.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToList();
+        if (unique.Count == 0) return found.ToList();
+
+        var tasks = unique.Select(r => CrtShSubdomainsAsync(r, ct)).ToList();
+        try { await Task.WhenAll(tasks).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch { /* partial ok */ }
+
+        foreach (var t in tasks)
+        {
+            try
+            {
+                if (t.IsCompletedSuccessfully)
+                    foreach (var d in t.Result) found.Add(d);
+            }
+            catch { }
+        }
+        return found.ToList();
+    }
+
     /// <summary>
-    /// Expand a root domain into related domains via two free, key-less sources, run in parallel:
-    ///   1. <b>crt.sh</b> (Certificate Transparency) — every subdomain / SAN under the root
-    ///      (e.g. yandex.ru → mail.yandex.ru, an.yandex.ru …).
-    ///   2. <b>cross-TLD brand probe</b> — generate &lt;brand&gt;.&lt;tld&gt; over a curated TLD set
-    ///      and keep the ones that actually resolve in DNS (e.g. yandex.ru → yandex.md, yandex.kz …).
-    ///      No paid API: a real brand TLD resolves, garbage does not.
-    /// Returns the root plus up to <paramref name="cap"/> related domains (deduped, wildcards stripped).
+    /// Expand a root domain: crt.sh subdomains + a few cross-TLD mirrors.
+    /// Hard time budget (~5 s) so «Принять» does not hang on slow DNS/crt.sh.
     /// </summary>
     public async Task<List<string>> ExpandAsync(string rootDomain, int cap, CancellationToken ct)
     {
         string root = Normalize(rootDomain);
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (root.Length == 0) return result.ToList();
-        result.Add(root);
 
-        var crt = CrtShSubdomainsAsync(root, ct);
-        var tld = CrossTldVariantsAsync(root, ct);
-        foreach (var d in await crt.ConfigureAwait(false)) result.Add(d);
-        foreach (var d in await tld.ConfigureAwait(false)) result.Add(d);
+        result.Add(root);
+        if (!root.StartsWith("www.", StringComparison.Ordinal))
+            result.Add("www." + root);
+
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        budget.CancelAfter(TimeSpan.FromSeconds(6));
+
+        try
+        {
+            var crt = CrtShSubdomainsAsync(root, budget.Token);
+            var tld = CrossTldVariantsAsync(root, budget.Token);
+            await Task.WhenAll(crt, tld).ConfigureAwait(false);
+            foreach (var d in await crt.ConfigureAwait(false)) result.Add(d);
+            foreach (var d in await tld.ConfigureAwait(false)) result.Add(d);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Budget expired — return root (+ anything collected so far is already in result).
+        }
 
         return result
             .OrderBy(d => d.Length).ThenBy(d => d, StringComparer.OrdinalIgnoreCase)
@@ -149,53 +206,73 @@ public sealed class TargetService
             .ToList();
     }
 
-    /// <summary>crt.sh subdomains/SAN under the root (best-effort; empty if crt.sh is offline/flaky).</summary>
+    /// <summary>Minimal list for instant save before background refinement.</summary>
+    public static List<string> QuickSeed(string rootDomain)
+    {
+        string root = Normalize(rootDomain);
+        if (root.Length == 0) return new();
+        var list = new List<string> { root };
+        if (!root.StartsWith("www.", StringComparison.Ordinal))
+            list.Add("www." + root);
+        return list;
+    }
+
     private async Task<List<string>> CrtShSubdomainsAsync(string root, CancellationToken ct)
     {
         var found = new List<string>();
+        const int maxHosts = 40;
         try
         {
+            using var reqCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            reqCts.CancelAfter(TimeSpan.FromSeconds(2.5));
             string url = $"https://crt.sh/?q=%25.{Uri.EscapeDataString(root)}&output=json";
-            using var resp = await Http.GetAsync(url, ct).ConfigureAwait(false);
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            using var resp = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, reqCts.Token)
+                .ConfigureAwait(false);
             resp.EnsureSuccessStatusCode();
-            await using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
+            await using var stream = await resp.Content.ReadAsStreamAsync(reqCts.Token).ConfigureAwait(false);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: reqCts.Token).ConfigureAwait(false);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var el in doc.RootElement.EnumerateArray())
             {
+                if (found.Count >= maxHosts) break;
                 if (!el.TryGetProperty("name_value", out var nv)) continue;
                 foreach (var raw in (nv.GetString() ?? "").Split('\n'))
                 {
+                    if (found.Count >= maxHosts) break;
                     string d = raw.Trim().ToLowerInvariant();
                     if (d.StartsWith("*.", StringComparison.Ordinal)) d = d[2..];
                     if (d.Length == 0 || d.Contains(' ') || d.Contains('@') || !d.Contains('.')) continue;
-                    if (d == root || d.EndsWith("." + root, StringComparison.Ordinal)) found.Add(d);
+                    if (d == root || d.EndsWith("." + root, StringComparison.Ordinal))
+                    {
+                        if (seen.Add(d)) found.Add(d);
+                    }
                 }
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch { /* crt.sh flaky/offline — cross-TLD probe still works */ }
+        catch { /* crt.sh slow/offline — root+www already enough */ }
         return found;
     }
 
-    /// <summary>TLDs the brand probe tries — gTLDs + RU-relevant ccTLDs (incl. common multi-label ones).</summary>
-    private static readonly string[] BrandTlds =
-    {
-        "ru", "com", "net", "org", "info", "biz", "io", "app", "dev", "me", "tv", "online",
-        "site", "store", "xyz", "pro", "su", "рф",
-        "by", "kz", "ua", "uz", "md", "ge", "am", "az", "kg", "tj", "tm", "ee", "lv", "lt",
-        "pl", "de", "fr", "fi", "tr", "il", "cz", "rs", "bg",
-        "com.tr", "com.ua", "com.ge", "co.il", "co.uk",
-    };
+    /// <summary>Small TLD set for a fast DNS probe (not the full world list).</summary>
+    private static readonly string[] FastBrandTlds = { "ru", "com", "net", "org", "io", "by", "kz", "ua" };
 
-    /// <summary>Same-brand domains on other TLDs that actually resolve in DNS (no paid API).</summary>
     private static async Task<List<string>> CrossTldVariantsAsync(string root, CancellationToken ct)
     {
         string brand = BrandLabel(root);
-        if (brand.Length < 2) return new();
+        if (brand.Length < 2 || brand.Equals(root, StringComparison.OrdinalIgnoreCase))
+            return new();
 
-        var candidates = BrandTlds.Select(t => brand + "." + t).Distinct(StringComparer.OrdinalIgnoreCase);
+        var candidates = FastBrandTlds
+            .Select(t => brand + "." + t)
+            .Where(h => !h.Equals(root, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (candidates.Count == 0) return new();
+
         var alive = new System.Collections.Concurrent.ConcurrentBag<string>();
-        using var gate = new SemaphoreSlim(16);
+        using var gate = new SemaphoreSlim(8);
         var tasks = candidates.Select(async host =>
         {
             await gate.WaitAsync(ct).ConfigureAwait(false);
@@ -222,7 +299,7 @@ public sealed class TargetService
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(TimeSpan.FromSeconds(4));
+            cts.CancelAfter(TimeSpan.FromSeconds(1.2));
             var addrs = await Dns.GetHostAddressesAsync(host, cts.Token).ConfigureAwait(false);
             return addrs.Length > 0;
         }

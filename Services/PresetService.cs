@@ -208,14 +208,14 @@ public sealed class PresetService
         "web.whatsapp.com,www.web.whatsapp.com,static.whatsapp.net,mmg.whatsapp.net,g.whatsapp.net,v.whatsapp.net," +
         "dyn.web.whatsapp.com,graph.whatsapp.com,pps.whatsapp.net,edge-chat.facebook.com,star.fallback.c10r.facebook.com";
 
-    /// <summary>Social web FIRST → Discord → rest.</summary>
+    /// <summary>YouTube first — video CDN (googlevideo QUIC) must match before other services.</summary>
     private static void AppendServiceProfiles(List<string> a)
     {
-        AppendSocialWebBridgeProfiles(a, firstSegment: true);
+        AppendYoutubeProfiles(a, firstSegment: true);
+        AppendSocialWebBridgeProfiles(a, firstSegment: false);
         AppendDiscordProfiles(a, firstSegment: false);
         AppendWhatsappProfiles(a, firstSegment: false);
         AppendTiktokProfiles(a, firstSegment: false);
-        AppendYoutubeProfiles(a, firstSegment: false);
         AppendInstagramProfiles(a, firstSegment: false);
         AppendTelegramDesktopProfiles(a, firstSegment: false);
         AppendTelegramWebProfiles(a, firstSegment: false);
@@ -421,6 +421,17 @@ public sealed class PresetService
         a.AddRange(new[]
         {
             "--filter-tcp=80,443",
+            "--hostlist-domains=googlevideo.com",
+            "--out-range=-d8",
+            "--lua-desync=send:repeats=1",
+            "--lua-desync=syndata:blob=tls_google",
+            "--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1:seqovl_pattern=tls_google",
+        });
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
             "{HOSTLIST:youtube}",
             "--out-range=-n4",
         });
@@ -434,6 +445,16 @@ public sealed class PresetService
             "--out-range=-n8",
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=6:payload=all",
+        });
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-udp=443",
+            "{IPSET:googlevideo}",
+            "--out-range=-n8",
+            "--payload=all",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=8:payload=all",
         });
     }
 

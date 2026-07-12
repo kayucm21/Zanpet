@@ -594,12 +594,139 @@
 
                             <Border Style="{StaticResource Card}" Margin="0,16,0,0">
                                 <StackPanel>
+                                    <TextBlock Text="Свой домен" Style="{StaticResource H2}" Margin="0,0,0,8"/>
+                                    <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"
+                                               Text="Вставьте ссылку — проверка ping/TLS, белый список, DNS→IP, затем обход (до 10 сек)."/>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Text="{Binding DomainInput, UpdateSourceTrigger=PropertyChanged}"
+                                                 Margin="0,0,10,0" VerticalContentAlignment="Center"
+                                                 IsEnabled="{Binding IsAnalyzingDomain, Converter={StaticResource InverseBool}}"
+                                                 ToolTip="example.com или https://site.ru"/>
+                                        <Button Grid.Column="1" Content="Принять"
+                                                Command="{Binding AcceptDomainCommand}"
+                                                Style="{StaticResource PrimaryButton}" MinWidth="100"
+                                                IsEnabled="{Binding IsAnalyzingDomain, Converter={StaticResource InverseBool}}"/>
+                                    </Grid>
+                                    <TextBlock Text="{Binding DomainAnalyzeStatus}" Style="{StaticResource Muted}"
+                                               FontSize="11.5" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                    <ProgressBar Height="4" Margin="0,0,0,10" IsIndeterminate="True"
+                                                 Visibility="{Binding IsAnalyzingDomain, Converter={StaticResource BoolToVis}}"/>
+                                    <Grid Margin="0,0,0,8"
+                                          Visibility="{Binding HasCustomTargets, Converter={StaticResource BoolToVis}}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Сохранённые домены" Style="{StaticResource Muted}"
+                                                   VerticalAlignment="Center"/>
+                                        <Button Grid.Column="1" Content="Удалить"
+                                                Command="{Binding DeleteDomainCommand}"
+                                                Style="{StaticResource GhostButton}" Padding="10,4"/>
+                                    </Grid>
+                                    <ListBox ItemsSource="{Binding CustomTargets}"
+                                             SelectedItem="{Binding SelectedCustomTarget}"
+                                             MaxHeight="180" BorderThickness="0" Background="Transparent"
+                                             Visibility="{Binding HasCustomTargets, Converter={StaticResource BoolToVis}}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="0,4">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Muted}" FontSize="11"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="IP исключение" Style="{StaticResource H2}" Margin="0,0,0,8"/>
+                                    <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"
+                                               Text="Игры и серверы: IP не трогается DPI (TCP/UDP фильтр). Сначала ping и порты — если стабильно, нажмите Принять."/>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Text="{Binding IpInput, UpdateSourceTrigger=PropertyChanged}"
+                                                 Margin="0,0,10,0" VerticalContentAlignment="Center"
+                                                 IsEnabled="{Binding IsProbingIp, Converter={StaticResource InverseBool}}"
+                                                 ToolTip="1.2.3.4 или 10.0.0.0/24"/>
+                                        <Button Grid.Column="1" Content="Принять"
+                                                Command="{Binding AcceptIpCommand}"
+                                                Style="{StaticResource PrimaryButton}" MinWidth="100"
+                                                IsEnabled="{Binding IsProbingIp, Converter={StaticResource InverseBool}}"/>
+                                    </Grid>
+                                    <TextBlock Text="{Binding IpProbeStatus}" Style="{StaticResource Muted}"
+                                               FontSize="11.5" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                    <ProgressBar Height="4" Margin="0,0,0,10" IsIndeterminate="True"
+                                                 Visibility="{Binding IsProbingIp, Converter={StaticResource BoolToVis}}"/>
+                                    <Grid Margin="0,0,0,8"
+                                          Visibility="{Binding HasCustomIpRules, Converter={StaticResource BoolToVis}}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Сохранённые IP" Style="{StaticResource Muted}"
+                                                   VerticalAlignment="Center"/>
+                                        <Button Grid.Column="1" Content="Удалить"
+                                                Command="{Binding DeleteIpCommand}"
+                                                Style="{StaticResource GhostButton}" Padding="10,4"/>
+                                    </Grid>
+                                    <ListBox ItemsSource="{Binding CustomIpRules}"
+                                             SelectedItem="{Binding SelectedIpRule}"
+                                             MaxHeight="140" BorderThickness="0" Background="Transparent"
+                                             Visibility="{Binding HasCustomIpRules, Converter={StaticResource BoolToVis}}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="0,4">
+                                                    <TextBlock Text="{Binding Cidr}" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Muted}" FontSize="11"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                                <StackPanel>
                                     <TextBlock Text="Игровой фильтр" Style="{StaticResource H2}" Margin="0,0,0,8"/>
                                     <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,10"
                                                Text="По умолчанию ВЫКЛ — обход не трогает игровой трафик (высокие порты), игры работают напрямую. Включите, только если душат саму игру. Меняется на лету — движок перезапустится."/>
                                     <CheckBox Content="Распространять обход на игровые порты (>1023)"
                                               IsChecked="{Binding GameFilter}" Style="{StaticResource ToggleSwitch}"
                                               Margin="0,4"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Голосовой помощник" Style="{StaticResource H2}" Margin="0,0,0,8"/>
+                                    <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,6"
+                                               Text="Работает автоматически — ничего настраивать не нужно. Подключение к серверу и агенты подбираются сами."/>
+                                    <TextBlock Style="{StaticResource Muted}" FontSize="11.5" TextWrapping="Wrap" Margin="0,0,0,12"
+                                               Text="{Binding VoiceAssistantCardStatus}"/>
+                                    <CheckBox Content="Авто-подбор агента OpenCode"
+                                              Style="{StaticResource ToggleSwitchLocked}" Margin="0,6"/>
+                                    <CheckBox Content="Озвучивать ответы (TTS)"
+                                              Style="{StaticResource ToggleSwitchLocked}" Margin="0,6"/>
+                                    <TextBlock Text="Язык озвучки" Style="{StaticResource Muted}" Margin="0,12,0,6"/>
+                                    <ComboBox ItemsSource="{Binding VoiceTtsLanguages}"
+                                              SelectedValue="{Binding VoiceTtsLanguage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              SelectedValuePath="Code"
+                                              DisplayMemberPath="Label"
+                                              MinWidth="220" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+                                    <Button Content="Запустить OpenCode в терминале"
+                                            Command="{Binding LaunchOpenCodeTerminalCommand}"
+                                            Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="0,0,0,4"/>
+                                    <TextBlock Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap"
+                                               Text="Если OpenCode уже запущен (Desktop или другое окно), второй сервер не нужен — помощник подключится сам. Кнопка запускает сервер только когда его нет."/>
                                 </StackPanel>
                             </Border>
 
@@ -717,6 +844,11 @@
                             </Border>
                         </StackPanel>
                     </ScrollViewer>
+                </TabItem>
+
+                <!-- ===================== Голосовой ===================== -->
+                <TabItem Header="Голосовой">
+                    <ctl:VoiceAssistantPanel/>
                 </TabItem>
 
                 <!-- ===================== Журнал ===================== -->

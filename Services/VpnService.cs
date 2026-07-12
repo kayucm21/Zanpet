@@ -15,11 +15,21 @@ public sealed class VpnService : IDisposable
     private Process? _proc;
     private string? _savedDns;
 
+    private enum RunMode { None, FullVpn, ShopBridge }
+    private RunMode _runMode = RunMode.None;
+
     private static HttpClient Http => HttpFactory.General;
 
     public bool IsConnected => _proc is { HasExited: false };
+    public bool IsFullVpnActive => IsConnected && _runMode == RunMode.FullVpn;
+    public bool IsShopBridgeActive => IsConnected && _runMode == RunMode.ShopBridge;
 
     public event Action<string>? LogLine;
+
+    public const int SocksPort = 10808;
+    public const int HttpPort = 10809;
+
+    private bool _discordThroughVpn;
 
     private static string XrayDir => Path.Combine(AppPaths.EngineDir, "xray");
     private static string XrayExe => Path.Combine(XrayDir, "xray.exe");
@@ -364,14 +374,38 @@ public sealed class VpnService : IDisposable
 
     // ---- start / stop ----
 
-    public void Start(VpnServer server)
+    public void Start(VpnServer server, bool discordThroughVpn = false)
     {
         if (IsConnected) Stop();
         if (!IsXrayInstalled) throw new FileNotFoundException("xray.exe не найден. Скачайте xray-core.");
 
+        _runMode = RunMode.FullVpn;
+        _discordThroughVpn = discordThroughVpn;
+        StartXrayProcess(server);
+        Thread.Sleep(500);
+        _savedDns = SaveAndSetDns();
+        SetSystemProxy("127.0.0.1", HttpPort, SocksPort, server.Address, discordThroughVpn);
+        if (discordThroughVpn)
+            LogLine?.Invoke("[vpn] Мост магазина Discord: трафик discord.com/stripe через VPN (не в bypass).");
+    }
+
+    /// <summary>SOCKS-only bridge for Discord Desktop — no system proxy, no DNS change (strategy shop bridge).</summary>
+    public void StartShopBridge(VpnServer server)
+    {
+        if (IsFullVpnActive) return;
+        if (IsConnected) Stop();
+        if (!IsXrayInstalled) throw new FileNotFoundException("xray.exe не найден.");
+
+        _runMode = RunMode.ShopBridge;
+        StartXrayProcess(server);
+        Thread.Sleep(500);
+        LogLine?.Invoke("[shop-bridge] SOCKS 127.0.0.1:10808 — только Discord, без системного VPN");
+    }
+
+    private void StartXrayProcess(VpnServer server)
+    {
         string configJson = GenerateConfig(server);
         File.WriteAllText(XrayConfigPath, configJson, new UTF8Encoding(false));
-        LogLine?.Invoke($"[vpn] Config:\n{configJson}");
 
         var psi = new ProcessStartInfo
         {
@@ -385,6 +419,7 @@ public sealed class VpnService : IDisposable
         };
 
         var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
+        var mode = _runMode;
         proc.OutputDataReceived += (_, e) => { if (e.Data is not null) LogLine?.Invoke($"[xray] {e.Data}"); };
         proc.ErrorDataReceived += (_, e) => { if (e.Data is not null) LogLine?.Invoke($"[xray] {e.Data}"); };
         proc.Exited += (_, _) =>
@@ -392,45 +427,72 @@ public sealed class VpnService : IDisposable
             int exitCode = 0;
             try { exitCode = proc.ExitCode; } catch { }
             LogLine?.Invoke($"[xray] Процесс завершён (код: {exitCode}).");
-            ClearSystemProxy();
-            RestoreDns(_savedDns);
-            _savedDns = null;
+            if (mode == RunMode.FullVpn)
+            {
+                ClearSystemProxy();
+                RestoreDns(_savedDns);
+                _savedDns = null;
+            }
+            if (_runMode == mode) _runMode = RunMode.None;
         };
         proc.Start();
         proc.BeginOutputReadLine();
         proc.BeginErrorReadLine();
         _proc = proc;
+    }
 
-        Thread.Sleep(500);
-        _savedDns = SaveAndSetDns();
-        SetSystemProxy("127.0.0.1", 10809, 10808, server.Address);
+    public void StopShopBridge()
+    {
+        if (_runMode == RunMode.ShopBridge) Stop();
     }
 
     public void Stop()
     {
-        ClearSystemProxy();
-        RestoreDns(_savedDns);
-        _savedDns = null;
-        if (_proc is null) return;
+        if (_runMode == RunMode.FullVpn)
+        {
+            ClearSystemProxy();
+            RestoreDns(_savedDns);
+            _savedDns = null;
+        }
+        if (_proc is null)
+        {
+            _runMode = RunMode.None;
+            return;
+        }
         try
         {
             if (!_proc.HasExited)
-            {
                 _proc.Kill(entireProcessTree: true);
-            }
         }
         catch { }
         _proc?.Dispose();
         _proc = null;
+        _runMode = RunMode.None;
     }
 
-    // ---- system proxy (Windows) ----
-
-    private static void SetSystemProxy(string host, int httpPort, int socksPort, string? vpnServerIp = null)
+    /// <summary>True when local xray SOCKS inbound is accepting connections.</summary>
+    public static bool IsLocalSocksListening()
     {
         try
         {
-            string proxyOverride = BuildProxyOverride(vpnServerIp);
+            using var tcp = new TcpClient();
+            var task = tcp.ConnectAsync("127.0.0.1", SocksPort);
+            if (!task.Wait(TimeSpan.FromSeconds(2))) return false;
+            return tcp.Connected;
+        }
+        catch { return false; }
+    }
+
+    public static string ShopSocksProxyArg => $"--proxy-server=socks5://127.0.0.1:{SocksPort}";
+
+    // ---- system proxy (Windows) ----
+
+    private static void SetSystemProxy(string host, int httpPort, int socksPort, string? vpnServerIp = null,
+        bool discordThroughVpn = false)
+    {
+        try
+        {
+            string proxyOverride = BuildProxyOverride(vpnServerIp, discordThroughVpn);
 
             using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
                 @"Software\Microsoft\Windows\CurrentVersion\Internet Settings", true))
@@ -554,15 +616,20 @@ public sealed class VpnService : IDisposable
         return null;
     }
 
-    private static string BuildProxyOverride(string? vpnServerIp = null)
+    private static string BuildProxyOverride(string? vpnServerIp = null, bool discordThroughVpn = false)
     {
         string list = "localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;" +
                       "172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;" +
-                      "172.30.*;172.31.*;192.168.*;<local>;" +
-                      "discord.com;discord.gg;discordapp.com;*.discord.com;*.discord.gg;*.discordapp.com;" +
-                      "discord.media;*.discord.media;" +
-                      "gateway.discord.gg;cdn.discord.com;media.discordcdn.com;" +
-                      "sentry.io;*.sentry.io";
+                      "172.30.*;172.31.*;192.168.*;<local>;";
+        // Legacy: Discord bypassed system proxy so zapret+DPI handled chat/voice directly.
+        // Shop/Nitro needs foreign IP — when discordThroughVpn, Discord+Stripe go through xray.
+        if (!discordThroughVpn)
+        {
+            list += "discord.com;discord.gg;discordapp.com;*.discord.com;*.discord.gg;*.discordapp.com;" +
+                    "discord.media;*.discord.media;" +
+                    "gateway.discord.gg;cdn.discord.com;media.discordcdn.com;";
+        }
+        list += "sentry.io;*.sentry.io";
         if (!string.IsNullOrEmpty(vpnServerIp))
             list += $";{vpnServerIp}";
         return list;

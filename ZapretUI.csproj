@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0-windows</TargetFramework>
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -13,7 +13,10 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
-    <Version>2.9.10</Version>
+    <Version>2.9.12</Version>
+    <AssemblyVersion>2.9.12.0</AssemblyVersion>
+    <FileVersion>2.9.12.0</FileVersion>
+    <InformationalVersion>2.9.12+3</InformationalVersion>
     <Product>Zapret UI</Product>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <!-- Self-contained single-file publish so the user needs nothing installed -->
@@ -45,6 +48,7 @@
     <!-- Color-emoji rendering for WPF (WPF can't draw color emoji natively).
          Provides emoji:TextBlock / emoji:RichTextBox with the bundled Twemoji font. -->
     <PackageReference Include="Emoji.Wpf" Version="0.3.4" />
+    <PackageReference Include="System.Speech" Version="9.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -61,15 +65,20 @@
        so we copy engine binaries via a post-publish target. -->
   <ItemGroup>
     <Content Include="ClassicData\**\*" CopyToPublishDirectory="Always" Link="ClassicData\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Content Include="Scripts\Start-OpenCodeServe.cmd" CopyToPublishDirectory="Always" Link="Start-OpenCodeServe.cmd" />
   </ItemGroup>
 
   <!-- Copy engine binaries after publish (PublishSingleFile strips them from Content) -->
   <Target Name="CopyEngineBinaries" AfterTargets="Publish">
     <ItemGroup>
       <_EngineBinaries Include="ClassicData\exe\*.exe;ClassicData\exe\*.dll;ClassicData\exe\*.sys" />
+      <_PublishScripts Include="Scripts\Start-OpenCodeServe.cmd" />
     </ItemGroup>
     <Copy SourceFiles="@(_EngineBinaries)"
           DestinationFiles="@(_EngineBinaries->'$(PublishDir)ClassicData\exe\%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_PublishScripts)"
+          DestinationFiles="@(_PublishScripts->'$(PublishDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 

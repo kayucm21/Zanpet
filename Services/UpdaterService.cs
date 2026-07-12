@@ -77,6 +77,21 @@ public sealed class UpdaterService
         }
     }
 
+    /// <summary>Same-version rebuild counter (InformationalVersion suffix +N).</summary>
+    public static int AppBuild
+    {
+        get
+        {
+            var attr = System.Reflection.Assembly.GetExecutingAssembly()
+                .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+                .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+                .FirstOrDefault();
+            string iv = attr?.InformationalVersion ?? "";
+            var m = Regex.Match(iv, @"\+(\d+)(?:\.|$)");
+            return m.Success && int.TryParse(m.Groups[1].Value, out int b) ? b : 1;
+        }
+    }
+
     /// <summary>Check FTP + GitHub in parallel; pick newest for install (FTP wins on tie).</summary>
     public async Task<AppUpdateSnapshot> FetchAppUpdateSnapshotAsync(
         FtpUpdateSettings? ftpSettings = null,
@@ -116,9 +131,12 @@ public sealed class UpdaterService
             var root = doc.RootElement;
             string tag = root.GetProperty("tag_name").GetString() ?? "";
             string url = root.TryGetProperty("html_url", out var u) ? (u.GetString() ?? "") : "";
+            string body = root.TryGetProperty("body", out var bd) ? (bd.GetString() ?? "") : "";
+            int build = ParseBuildFromNotes(body);
+            string? notes = ExtractUserNotes(body);
             if (string.IsNullOrEmpty(url)) url = AppReleasesPage;
             if (!string.IsNullOrEmpty(tag))
-                return new AppReleaseInfo(tag.TrimStart('v'), url, AppReleaseSource.GitHub);
+                return new AppReleaseInfo(tag.TrimStart('v'), url, AppReleaseSource.GitHub, null, build, notes);
         }
         catch { /* API blocked */ }
 
@@ -137,6 +155,22 @@ public sealed class UpdaterService
         catch { }
 
         return null;
+    }
+
+    private static int ParseBuildFromNotes(string? text)
+    {
+        var m = Regex.Match(text ?? "", @"\[build:(\d+)\]", RegexOptions.IgnoreCase);
+        return m.Success && int.TryParse(m.Groups[1].Value, out int b) ? b : 0;
+    }
+
+    private static string? ExtractUserNotes(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var lines = text.Split('\n')
+            .Select(l => l.Trim())
+            .Where(l => l.Length > 0 && !Regex.IsMatch(l, @"^\[build:\d+\]$", RegexOptions.IgnoreCase))
+            .ToList();
+        return lines.Count == 0 ? null : string.Join("\n", lines);
     }
 
     /// <summary>Latest app release — prefers newest of FTP/GitHub (FTP on tie).</summary>
@@ -299,7 +333,7 @@ public sealed class UpdaterService
                 throw lastError ?? new InvalidOperationException("Не удалось скачать обновление.");
 
             progress?.Report(1);
-            AppUpdateInstaller.ExtractZip(zipPath, stageDir);
+            AppUpdateInstaller.ExtractZip(zipPath, stageDir, tag);
 
             string installDir = AppUpdateInstaller.GetInstallDirectory();
             WriteCooldown();
@@ -326,11 +360,13 @@ public sealed class UpdaterService
         return m.Success && Version.TryParse(m.Value, out var v) ? v : null;
     }
 
-    /// <summary>True if the release tag is a newer SemVer than the running app.</summary>
-    public static bool IsAppUpdate(string tag)
+    /// <summary>True if the release tag is a newer SemVer than the running app, or same version with higher build.</summary>
+    public static bool IsAppUpdate(string tag, int remoteBuild = 0)
     {
         var latest = ParseTagVersion(tag);
-        return latest is not null && Version.TryParse(AppVersion, out var cur) && latest > cur;
+        if (latest is null || !Version.TryParse(AppVersion, out var cur)) return false;
+        if (latest > cur) return true;
+        return latest == cur && remoteBuild > AppBuild;
     }
 
     /// <summary>

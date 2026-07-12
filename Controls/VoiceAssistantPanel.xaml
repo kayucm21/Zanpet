@@ -1,0 +1,187 @@
+<UserControl x:Class="ZapretUI.Controls.VoiceAssistantPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="VoiceRoot">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="2,0,0,12">
+            <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap"
+                       Text="{Binding VoiceStatus}"/>
+            <TextBlock Style="{StaticResource Muted}" FontSize="11" Margin="0,4,0,0"
+                       Text="{Binding SpeechCapabilityText}"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Background="{StaticResource BgBrush}" CornerRadius="14" Padding="10"
+                BorderBrush="{StaticResource BorderBrush2}" BorderThickness="1">
+            <ListBox x:Name="VoiceChatList" ItemsSource="{Binding VoiceMessages}"
+                     Background="Transparent" BorderThickness="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Padding" Value="4,3"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Focusable" Value="False"/>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel HorizontalAlignment="{Binding Role, Converter={StaticResource VoiceAlign}}"
+                                    MaxWidth="520">
+                            <Border CornerRadius="14" Padding="12,9" Margin="0,2"
+                                    Background="{Binding Role, Converter={StaticResource VoiceBubble}}"
+                                    BorderBrush="{StaticResource BorderBrush2}" BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="13.5"
+                                               Foreground="{StaticResource FgBrush}"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding AgentName}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding AgentName}" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+                                        <TextBlock Text="агент:" Style="{StaticResource Muted}" FontSize="10.5"/>
+                                        <TextBlock Text="{Binding AgentName}" Style="{StaticResource Muted}"
+                                                   FontSize="10.5" Margin="4,0,0,0" Foreground="{StaticResource AccentBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+
+        <!-- Alice-style bottom bar: text + mic -->
+        <Border Grid.Row="2" Margin="0,14,0,0" CornerRadius="16" Padding="12"
+                Background="{StaticResource CardBrush}" BorderBrush="{StaticResource BorderBrush2}" BorderThickness="1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Text="{Binding VoiceInput, UpdateSourceTrigger=PropertyChanged}"
+                             MinHeight="40" VerticalContentAlignment="Center" Padding="12,8"
+                             AcceptsReturn="False"
+                             KeyDown="OnVoiceInputKeyDown">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Enter" Command="{Binding SendVoiceCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
+                    <Button Grid.Column="1" Content="Отправить" Command="{Binding SendVoiceCommand}"
+                            Style="{StaticResource PrimaryButton}" Margin="10,0,0,0" MinWidth="100"/>
+                </Grid>
+
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0" Content="Очистить" Command="{Binding ClearVoiceCommand}"
+                            Style="{StaticResource GhostButton}" HorizontalAlignment="Left" FontSize="11"/>
+
+                    <Button Grid.Column="1" Command="{Binding ToggleMicCommand}" Width="72" Height="72"
+                            ToolTip="Нажмите — начать запись. Ещё раз — остановить.">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Grid>
+                                                <Ellipse x:Name="glow" Width="88" Height="88" Opacity="0"
+                                                         Fill="{StaticResource AccentSoftBrush}"
+                                                         RenderTransformOrigin="0.5,0.5">
+                                                    <Ellipse.RenderTransform>
+                                                        <ScaleTransform x:Name="glowScale" ScaleX="1" ScaleY="1"/>
+                                                    </Ellipse.RenderTransform>
+                                                </Ellipse>
+                                                <Ellipse x:Name="circle" Width="72" Height="72"
+                                                         Fill="{TemplateBinding Background}">
+                                                    <Ellipse.Effect>
+                                                        <DropShadowEffect Color="#8060A5FA" BlurRadius="18" ShadowDepth="0"/>
+                                                    </Ellipse.Effect>
+                                                </Ellipse>
+                                                <TextBlock Text="&#xE720;" FontFamily="{StaticResource IconFont}"
+                                                           FontSize="28" HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center" Foreground="White"/>
+                                            </Grid>
+                                            <ControlTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.IsListening, ElementName=VoiceRoot}" Value="True">
+                                                    <Setter TargetName="circle" Property="Fill" Value="{StaticResource DangerBrush}"/>
+                                                    <Setter TargetName="glow" Property="Opacity" Value="1"/>
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard Name="MicPulse">
+                                                            <Storyboard RepeatBehavior="Forever">
+                                                                <DoubleAnimation Storyboard.TargetName="glowScale"
+                                                                                 Storyboard.TargetProperty="ScaleX"
+                                                                                 From="1" To="1.18" Duration="0:0:0.7"
+                                                                                 AutoReverse="True"/>
+                                                                <DoubleAnimation Storyboard.TargetName="glowScale"
+                                                                                 Storyboard.TargetProperty="ScaleY"
+                                                                                 From="1" To="1.18" Duration="0:0:0.7"
+                                                                                 AutoReverse="True"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <StopStoryboard BeginStoryboardName="MicPulse"/>
+                                                    </DataTrigger.ExitActions>
+                                                </DataTrigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="circle" Property="Opacity" Value="0.92"/>
+                                                </Trigger>
+                                                <Trigger Property="IsEnabled" Value="False">
+                                                    <Setter Property="Opacity" Value="0.45"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <TextBlock Grid.Column="2" FontSize="11"
+                               HorizontalAlignment="Right" VerticalAlignment="Center" TextWrapping="Wrap">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource Muted}">
+                                <Setter Property="Text" Value="Нажмите микрофон и говорите — текст появится в поле ввода"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DataContext.IsListening, ElementName=VoiceRoot}" Value="True">
+                                        <Setter Property="Text" Value="Идёт запись… говорите. Нажмите микрофон снова, чтобы остановить"/>
+                                        <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using ZapretUI.Services;
 
 namespace ZapretUI.Models;
 
@@ -21,7 +22,11 @@ public sealed record AppUpdateSnapshot(
                 var b = ParseVersion(best.Tag);
                 if (a is null) continue;
                 if (b is null || a > b) best = r;
-                else if (a == b && r.Source == AppReleaseSource.Ftp) best = r;
+                else if (a == b)
+                {
+                    if (r.Build > best.Build) best = r;
+                    else if (r.Build == best.Build && r.Source == AppReleaseSource.Ftp) best = r;
+                }
             }
             return best;
         }
@@ -33,10 +38,18 @@ public sealed record AppUpdateSnapshot(
         {
             var newest = NewestRelease;
             if (newest is null) return false;
+            if (!Version.TryParse(CurrentVersion, out var cur)) return false;
             var latest = ParseVersion(newest.Tag);
-            return latest is not null && Version.TryParse(CurrentVersion, out var cur) && latest > cur;
+            if (latest is null) return false;
+            if (latest > cur) return true;
+            if (latest == cur && newest.Build > AppUpdateSnapshot.CurrentBuild) return true;
+            return false;
         }
     }
+
+    public static int CurrentBuild => UpdaterService.AppBuild;
+
+    public int InstalledBuild => CurrentBuild;
 
     public string FtpDisplay => Ftp is null ? "недоступен" : $"v{Ftp.Tag}";
     public string GitHubDisplay => GitHub is null ? "недоступен" : $"v{GitHub.Tag}";

@@ -128,3 +128,29 @@ public sealed class StringEqualsToVisibilityConverter : IMultiValueConverter
     public object[] ConvertBack(object? v, Type[] t, object? p, CultureInfo c) =>
         throw new NotSupportedException();
 }
+
+/// <summary>VoiceMessageRole -> HorizontalAlignment for chat bubbles.</summary>
+public sealed class VoiceRoleToAlignmentConverter : IValueConverter
+{
+    public object Convert(object? v, Type t, object? p, CultureInfo c) =>
+        v is VoiceMessageRole.User ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+
+    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => Binding.DoNothing;
+}
+
+/// <summary>VoiceMessageRole -> bubble background brush.</summary>
+public sealed class VoiceRoleToBrushConverter : IValueConverter
+{
+    private static readonly SolidColorBrush User = new(Color.FromArgb(0x33, 0x60, 0xA5, 0xFA));
+    private static readonly SolidColorBrush Assistant = new(Color.FromArgb(0x55, 0x1C, 0x24, 0x31));
+    private static readonly SolidColorBrush System = new(Color.FromArgb(0x33, 0x92, 0xA0, 0xB3));
+
+    public object Convert(object? v, Type t, object? p, CultureInfo c) => v switch
+    {
+        VoiceMessageRole.User => User,
+        VoiceMessageRole.Assistant => Assistant,
+        _ => System
+    };
+
+    public object ConvertBack(object? v, Type t, object? p, CultureInfo c) => Binding.DoNothing;
+}

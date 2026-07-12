@@ -7,7 +7,7 @@ namespace ZapretUI.Services;
 public sealed class AppSettings
 {
     /// <summary>Schema version for future migrations. Bump when adding/removing fields.</summary>
-    public int SettingsVersion { get; set; } = 12;
+    public int SettingsVersion { get; set; } = 16;
 
     public string? ActivePresetName { get; set; }
     public string? ActiveHostlist { get; set; }
@@ -79,6 +79,27 @@ public sealed class AppSettings
     /// <summary>Fixed MTProto secret for tg-ws-proxy (exactly 32 hex chars).</summary>
     public string TelegramWsProxySecret { get; set; } = "eecb9b9a39b6f0d6e8c4a2b1f0d3e7a0";
 
+    /// <summary>OpenCode HTTP server URL (opencode serve). Default local port 4096.</summary>
+    public string OpenCodeUrl { get; set; } = "http://127.0.0.1:4096";
+
+    /// <summary>Basic auth user for OpenCode server (if OPENCODE_SERVER_PASSWORD is set).</summary>
+    public string OpenCodeUsername { get; set; } = "opencode";
+
+    /// <summary>Basic auth password for OpenCode server.</summary>
+    public string OpenCodePassword { get; set; } = "";
+
+    /// <summary>OpenCode Zen / provider API key (sk-…). Sent to local opencode serve via PUT /auth.</summary>
+    public string OpenCodeApiKey { get; set; } = "";
+
+    /// <summary>Let the assistant auto-pick an OpenCode agent from the user request.</summary>
+    public bool VoiceAutoAgent { get; set; } = true;
+
+    /// <summary>Speak assistant replies aloud (TTS).</summary>
+    public bool VoiceSpeakResponses { get; set; } = true;
+
+    /// <summary>TTS voice culture: ru-RU, en-US, de-DE, etc.</summary>
+    public string VoiceTtsLanguage { get; set; } = "ru-RU";
+
     /// <summary>Last app version the user saw the changelog for. Empty = never shown.</summary>
     public string LastSeenVersion { get; set; } = "";
 
@@ -148,6 +169,33 @@ public sealed class AppSettings
         {
             FtpUpdateEnabled = true;
             SettingsVersion = 12;
+        }
+        if (SettingsVersion < 13)
+        {
+            if (string.IsNullOrWhiteSpace(OpenCodeUrl))
+                OpenCodeUrl = "http://127.0.0.1:4096";
+            if (string.IsNullOrWhiteSpace(OpenCodeUsername))
+                OpenCodeUsername = "opencode";
+            VoiceAutoAgent = true;
+            VoiceSpeakResponses = true;
+            SettingsVersion = 13;
+        }
+        if (SettingsVersion < 14)
+        {
+            OpenCodeApiKey ??= "";
+            SettingsVersion = 14;
+        }
+        if (SettingsVersion < 15)
+        {
+            VoiceAutoAgent = true;
+            VoiceSpeakResponses = true;
+            SettingsVersion = 15;
+        }
+        if (SettingsVersion < 16)
+        {
+            if (string.IsNullOrWhiteSpace(VoiceTtsLanguage))
+                VoiceTtsLanguage = "ru-RU";
+            SettingsVersion = 16;
         }
         return this;
     }

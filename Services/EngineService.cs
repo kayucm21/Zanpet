@@ -139,7 +139,82 @@ public sealed class EngineService : IDisposable
         // non-listed games/apps. Re-scope them to the user's custom targets, or drop them, so only
         // the explicit lists + targets get desynced (like Flowseal).
         var result = bypassAll ? args : ScopeCatchAllToTargets(args);
+        InjectUserIpRules(result, gameFilter);
         return result.Select(Fwd).ToList();
+    }
+
+    private static bool IpsetHasEntries(string path) =>
+        File.Exists(path) && File.ReadAllLines(path).Any(l =>
+        {
+            string t = l.Trim();
+            return t.Length > 0 && !t.StartsWith('#');
+        });
+
+    /// <summary>User exclude/bypass CIDR ipsets from Settings → IP / domain resolve.</summary>
+    private static void InjectUserIpRules(List<string> args, bool gameFilter)
+    {
+        string excludePath = AppPaths.IpsetFile(IpRuleService.ExcludeIpsetName);
+        string bypassPath = AppPaths.IpsetFile(IpRuleService.BypassIpsetName);
+        bool hasExclude = IpsetHasEntries(excludePath);
+        bool hasBypass = IpsetHasEntries(bypassPath);
+
+        if (hasExclude)
+        {
+            for (int i = 0; i < args.Count; i++)
+            {
+                if (!args[i].StartsWith("--ipset-exclude=", StringComparison.Ordinal))
+                    continue;
+
+                string customArg = "--ipset-exclude=" + excludePath;
+                bool alreadyNext = i + 1 < args.Count &&
+                    args[i + 1].Equals(customArg, StringComparison.OrdinalIgnoreCase);
+                if (!alreadyNext)
+                    args.Insert(i + 1, customArg);
+                i++; // never re-process the line we just inserted
+            }
+        }
+
+        if (!hasBypass) return;
+
+        args.Add("--new");
+        args.AddRange(new[]
+        {
+            "--filter-tcp=80,443,5222,8443",
+            $"--ipset={bypassPath}",
+            "--out-range=-d7",
+            "--lua-desync=send:repeats=2",
+            "--lua-desync=fakedsplit:pos=1:repeats=4",
+        });
+        args.Add("--new");
+        args.AddRange(new[]
+        {
+            "--filter-udp=443",
+            $"--ipset={bypassPath}",
+            "--payload=all",
+            "--out-range=-d8",
+            "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:repeats=8:payload=all",
+        });
+
+        if (gameFilter)
+        {
+            args.Add("--new");
+            args.AddRange(new[]
+            {
+                "--filter-tcp=1024-65535",
+                $"--ipset={bypassPath}",
+                "--out-range=-d7",
+                "--lua-desync=send:repeats=2",
+                "--lua-desync=fakedsplit:pos=1:repeats=3",
+            });
+            args.Add("--new");
+            args.AddRange(new[]
+            {
+                "--filter-udp=1024-65535",
+                $"--ipset={bypassPath}",
+                "--payload=all",
+                "--lua-desync=fake:blob=quic_google:repeats=6:payload=all",
+            });
+        }
     }
 
     /// <summary>

@@ -10,7 +10,7 @@
 [![Последняя версия](https://img.shields.io/github/v/release/kayucm21/Zanpet?label=версия)](https://github.com/kayucm21/Zanpet/releases/latest)
 [![Windows](https://img.shields.io/badge/Windows-10%2F11%20x64-blue)](https://github.com/kayucm21/Zanpet/releases/latest)
 
-**Скачать:** [ZapretUI-v2.9.11.zip](https://github.com/kayucm21/Zanpet/releases/download/v2.9.11/ZapretUI-v2.9.11.zip)
+**Скачать:** [ZapretUI-v2.9.12.zip](https://github.com/kayucm21/Zanpet/releases/download/v2.9.12/ZapretUI-v2.9.12.zip)
 
 </div>
 

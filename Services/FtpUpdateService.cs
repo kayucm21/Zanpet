@@ -1,6 +1,7 @@
 using System.IO;
 using System.Net;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using ZapretUI.Models;
 
 namespace ZapretUI.Services;
@@ -31,8 +32,11 @@ public static class FtpUpdateService
         if (string.IsNullOrWhiteSpace(tag) || string.IsNullOrWhiteSpace(file))
             throw new InvalidOperationException("update.json на FTP: нужны поля tag и file.");
 
+        int build = root.TryGetProperty("build", out var b) && b.TryGetInt32(out var bi) ? bi : 0;
+        string? notes = root.TryGetProperty("notes", out var n) ? n.GetString() : null;
+
         string display = $"ftp://{cfg.Host}{NormalizeRemotePath(cfg.RemotePath)}/{file}";
-        return new AppReleaseInfo(tag.TrimStart('v'), display, AppReleaseSource.Ftp, file);
+        return new AppReleaseInfo(tag.TrimStart('v'), display, AppReleaseSource.Ftp, file, build, notes);
     }
 
     public static async Task DownloadZipAsync(

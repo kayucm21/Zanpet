@@ -57,7 +57,7 @@ internal static class AppUpdateInstaller
         return path;
     }
 
-    public static void ExtractZip(string zipPath, string stageDir)
+    public static void ExtractZip(string zipPath, string stageDir, string expectedVersion)
     {
         if (Directory.Exists(stageDir))
             Directory.Delete(stageDir, recursive: true);
@@ -84,6 +84,21 @@ internal static class AppUpdateInstaller
         NormalizeStageDirectory(stageDir);
         EnsureCanonicalExecutable(stageDir);
         VerifyStageHasExecutable(stageDir);
+        VerifyStageVersion(stageDir, expectedVersion);
+    }
+
+    private static void VerifyStageVersion(string stageDir, string expectedVersion)
+    {
+        string exe = Path.Combine(stageDir, "ZapretUI.exe");
+        if (!File.Exists(exe))
+            throw new InvalidOperationException("В архиве нет ZapretUI.exe.");
+
+        var info = FileVersionInfo.GetVersionInfo(exe);
+        string actual = $"{info.ProductMajorPart}.{info.ProductMinorPart}.{info.ProductBuildPart}";
+        string expected = expectedVersion.TrimStart('v');
+        if (!string.Equals(actual, expected, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"Неверная версия в архиве: внутри v{actual}, ожидалась v{expected}. Скачайте заново с FTP/GitHub.");
     }
 
     /// <summary>Hoist nested folders until ZapretUI.exe is at stage root (any zip layout).</summary>

@@ -12,6 +12,8 @@
     <mvvm:DiagStatusToBrushConverter x:Key="DiagBrush"/>
     <mvvm:RefEqualsToVisibilityConverter x:Key="RefEqualsToVis"/>
     <mvvm:StringEqualsToVisibilityConverter x:Key="StringEqToVis"/>
+    <mvvm:VoiceRoleToAlignmentConverter x:Key="VoiceAlign"/>
+    <mvvm:VoiceRoleToBrushConverter x:Key="VoiceBubble"/>
 
     <!-- ====================== Palette (redesign · concept C) ====================== -->
     <Color x:Key="C.Bg">#FF090C11</Color>
@@ -622,6 +624,16 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- Always-on toggle indicator (not clickable). -->
+    <Style x:Key="ToggleSwitchLocked" TargetType="CheckBox" BasedOn="{StaticResource ToggleSwitch}">
+        <Setter Property="IsChecked" Value="True"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Cursor" Value="Arrow"/>
+        <Setter Property="Opacity" Value="1"/>
+        <Setter Property="IsEnabled" Value="True"/>
     </Style>
 
     <!-- ====================== ProgressBar ====================== -->

@@ -10,25 +10,32 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-
-if ([string]::IsNullOrWhiteSpace($ZipPath)) {
-    $root = Split-Path -Parent $PSScriptRoot
-    $zip = Get-ChildItem -Path (Join-Path $root "bin\Release\net9.0-windows\win-x64\publish") -Filter "ZapretUI-v*.zip" |
-        Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if (-not $zip) { throw "Соберите publish: dotnet publish -c Release" }
-    $ZipPath = $zip.FullName
-}
+$root = Split-Path -Parent $PSScriptRoot
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    $Version = [regex]::Match((Split-Path $ZipPath -Leaf), '\d+\.\d+\.\d+').Value
-    if (-not $Version) { throw "Не удалось определить версию из имени zip" }
+    $csproj = Get-Content (Join-Path $root "ZapretUI.csproj") -Raw
+    if ($csproj -match '<Version>(\d+\.\d+\.\d+)</Version>') { $Version = $Matches[1] }
+    else { throw "Version not found in csproj" }
+}
+
+if ([string]::IsNullOrWhiteSpace($ZipPath)) {
+    $buildScript = Join-Path $PSScriptRoot "Build-ReleaseZip.ps1"
+    & $buildScript -Version $Version
+    $ZipPath = Join-Path $root "bin\Release\net9.0-windows\win-x64\publish\ZapretUI-v$Version.zip"
+    if (-not (Test-Path $ZipPath)) { throw "Zip not found: $ZipPath" }
 }
 
 $fileName = Split-Path $ZipPath -Leaf
+$zipVersion = [regex]::Match($fileName, '\d+\.\d+\.\d+').Value
+if ($zipVersion -and $zipVersion -ne $Version) {
+    throw "Zip version ($zipVersion) != target ($Version)"
+}
 $manifest = @{
     version = $Version
     tag     = "v$Version"
+    build   = 2
     file    = $fileName
+    notes   = "v2.9.12: fix YouTube for all users — merged googlevideo ipset, expanded domains, multidisorder profile"
 } | ConvertTo-Json -Compress
 
 $manifestPath = Join-Path $env:TEMP "update.json"
@@ -54,7 +61,7 @@ function Upload-FtpFile($LocalPath, $RemoteName) {
     Write-Host "OK $RemoteName"
 }
 
-Write-Host "Загрузка на ftp://$FtpHost$FtpPath ..."
+Write-Host "Uploading to ftp://$FtpHost$FtpPath ..."
 Upload-FtpFile $ZipPath $fileName
 Upload-FtpFile $manifestPath "update.json"
-Write-Host "Готово. Друзья увидят v$Version при «Проверить обновления»."
+Write-Host "Done. Clients will see v$Version on update check."

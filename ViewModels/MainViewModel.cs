@@ -27,6 +27,11 @@ public sealed class MainViewModel : ObservableObject
     private readonly SocialHostsService _socialHosts = new();
     private readonly DiscordDesktopService _discordDesktop = new();
     private readonly DiscordShopBridgeService _discordShopBridge;
+    private readonly TargetService _targets = new();
+    private readonly DomainAutoConfigService _domainAuto;
+    private readonly IpRuleService _ipRules = new();
+    private readonly VoiceAssistantService _voice = new();
+    private CancellationTokenSource? _listenCts;
 
     public event Action<string, string>? Notify;
 
@@ -35,6 +40,7 @@ public sealed class MainViewModel : ObservableObject
     public MainViewModel()
     {
         _discordShopBridge = new DiscordShopBridgeService(_vpn);
+        _domainAuto = new DomainAutoConfigService(_hostlists, _targets);
         _engine.StateChanged += s => OnUi(() =>
         {
             State = s;
@@ -93,6 +99,25 @@ public sealed class MainViewModel : ObservableObject
         VpnPingCommand = new RelayCommand(async _ => await VpnPingAllAsync(), _ => !IsVpnBusy);
         VpnRefreshCommand = new RelayCommand(async _ => await VpnRefreshAsync(), _ => !IsVpnBusy);
 
+        AcceptDomainCommand = new RelayCommand(async _ => await AcceptDomainAsync(),
+            _ => !IsAnalyzingDomain && !string.IsNullOrWhiteSpace(DomainInput));
+        DeleteDomainCommand = new RelayCommand(_ => DeleteCustomTarget(),
+            _ => SelectedCustomTarget is not null && !IsAnalyzingDomain);
+
+        AcceptIpCommand = new RelayCommand(async _ => await AcceptIpAsync(),
+            _ => !IsProbingIp && !string.IsNullOrWhiteSpace(IpInput));
+        DeleteIpCommand = new RelayCommand(_ => DeleteIpRule(),
+            _ => SelectedIpRule is not null && !IsProbingIp);
+
+        SendVoiceCommand = new RelayCommand(async _ => await SendVoiceAsync(),
+            _ => !IsVoiceBusy && !string.IsNullOrWhiteSpace(VoiceInput));
+        ToggleMicCommand = new RelayCommand(async _ => await ToggleMicAsync(), _ => !IsVoiceBusy);
+        ClearVoiceCommand = new RelayCommand(_ => ClearVoiceChat(), _ => VoiceMessages.Count > 0 && !IsVoiceBusy);
+        LaunchOpenCodeTerminalCommand = new RelayCommand(async _ => await LaunchOpenCodeInTerminalAsync());
+
+        _voice.ConfigureFromSettings(Settings);
+        ReloadVoiceTtsOptions();
+
         _vpn.LogLine += line => OnUi(() => AppendLog(line));
 
         PresetsView = CollectionViewSource.GetDefaultView(Presets);
@@ -102,6 +127,7 @@ public sealed class MainViewModel : ObservableObject
 
         ReloadPresets();
 
+        SeedVoiceWelcome();
         _ = OnStartupVpnAsync();
     }
 
@@ -148,6 +174,9 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<Preset> Presets { get; } = new();
     public ICollectionView PresetsView { get; }
     public ObservableCollection<string> LogLines { get; } = new();
+    public ObservableCollection<CustomTarget> CustomTargets { get; } = new();
+    public ObservableCollection<CustomIpRule> CustomIpRules { get; } = new();
+    public ObservableCollection<VoiceChatMessage> VoiceMessages { get; } = new();
 
     // ---- commands ----------------------------------------------------------
 
@@ -171,6 +200,14 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand VpnConnectCommand { get; }
     public RelayCommand VpnPingCommand { get; }
     public RelayCommand VpnRefreshCommand { get; }
+    public RelayCommand AcceptDomainCommand { get; }
+    public RelayCommand DeleteDomainCommand { get; }
+    public RelayCommand AcceptIpCommand { get; }
+    public RelayCommand DeleteIpCommand { get; }
+    public RelayCommand SendVoiceCommand { get; }
+    public RelayCommand ToggleMicCommand { get; }
+    public RelayCommand ClearVoiceCommand { get; }
+    public RelayCommand LaunchOpenCodeTerminalCommand { get; }
 
     // ---- engine state ------------------------------------------------------
 
@@ -457,10 +494,18 @@ public sealed class MainViewModel : ObservableObject
     public int SelectedTabIndex
     {
         get => _selectedTabIndex;
-        set => SetField(ref _selectedTabIndex, value);
+        set
+        {
+            if (!SetField(ref _selectedTabIndex, value))
+                return;
+            if (value == VoiceTabIndex)
+                _ = OnVoiceTabOpenedAsync();
+        }
     }
 
     private const int SettingsTabIndex = 2;
+    private const int VoiceTabIndex = 4;
+    private bool _voiceWelcomeSpoken;
 
     public Preset? RecommendedPreset =>
         Presets.FirstOrDefault(p => p.IsRecommended) ?? Presets.FirstOrDefault();
@@ -483,6 +528,731 @@ public sealed class MainViewModel : ObservableObject
 
     private string _autoStatusText = "";
     public string AutoStatusText { get => _autoStatusText; private set => SetField(ref _autoStatusText, value); }
+
+    // ---- custom domains ----------------------------------------------------
+
+    private string _domainInput = "";
+    public string DomainInput
+    {
+        get => _domainInput;
+        set
+        {
+            if (SetField(ref _domainInput, value))
+                AcceptDomainCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private string _domainAnalyzeStatus = "Вставьте домен — программа найдёт поддомены и сохранит список для обхода.";
+    public string DomainAnalyzeStatus
+    {
+        get => _domainAnalyzeStatus;
+        private set => SetField(ref _domainAnalyzeStatus, value);
+    }
+
+    private bool _isAnalyzingDomain;
+    public bool IsAnalyzingDomain
+    {
+        get => _isAnalyzingDomain;
+        private set
+        {
+            if (SetField(ref _isAnalyzingDomain, value))
+            {
+                AcceptDomainCommand.RaiseCanExecuteChanged();
+                DeleteDomainCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    private CustomTarget? _selectedCustomTarget;
+    public CustomTarget? SelectedCustomTarget
+    {
+        get => _selectedCustomTarget;
+        set
+        {
+            if (SetField(ref _selectedCustomTarget, value))
+                DeleteDomainCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public bool HasCustomTargets => CustomTargets.Count > 0;
+
+    private void ReloadCustomTargets()
+    {
+        CustomTargets.Clear();
+        foreach (var t in _targets.GetTargets())
+            CustomTargets.Add(t);
+        OnPropertyChanged(nameof(HasCustomTargets));
+        SelectedCustomTarget ??= CustomTargets.FirstOrDefault();
+    }
+
+    private async Task AcceptDomainAsync()
+    {
+        string normalized = TargetService.Normalize(DomainInput);
+        if (normalized.Length == 0)
+        {
+            DomainAnalyzeStatus = "Некорректный домен. Пример: https://web.whatsapp.com/";
+            return;
+        }
+
+        string saveKey = TargetService.RegistrableRoot(normalized);
+        var plan = _domainAuto.Detect(DomainInput);
+
+        IsAnalyzingDomain = true;
+        try
+        {
+            var quick = TargetService.QuickSeed(normalized);
+            _targets.Save(saveKey, quick);
+            ReloadCustomTargets();
+            DomainInput = "";
+            DomainAnalyzeStatus = $"{plan.Label}: сохранено. Подбор доменов и портов (до 6 сек)…";
+
+            var analyzed = await _domainAuto.AnalyzeAsync(plan, CancellationToken.None).ConfigureAwait(true);
+
+            var finalDomains = analyzed.Domains;
+            if (_targets.Exists(saveKey))
+            {
+                finalDomains = _targets.ReadDomains(saveKey)
+                    .Concat(analyzed.Domains)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(plan.DomainCap)
+                    .ToList();
+            }
+
+            DomainAnalyzeStatus = "Проверка домена, IP и белого списка…";
+            var verify = await DomainVerifyService.VerifyAsync(
+                plan, finalDomains, _hostlists, CancellationToken.None).ConfigureAwait(true);
+            if (!verify.Ok)
+            {
+                DomainAnalyzeStatus = verify.Message;
+                AppendLog(verify.Message);
+                return;
+            }
+
+            if (verify.ResolvedIps.Count > 0)
+            {
+                _ipRules.AddBypassIps(verify.ResolvedIps, verify.PingMs, saveKey);
+                ReloadCustomIpRules();
+                AppendLog($"IP для обхода: {verify.ResolvedIps.Count} адрес(ов) из DNS.");
+            }
+
+            _targets.Save(saveKey, finalDomains, analyzed.OpenPorts);
+            plan.Tune?.Invoke(Settings);
+            _settingsSvc.Save();
+
+            ReloadCustomTargets();
+            SelectedCustomTarget = CustomTargets.FirstOrDefault(t =>
+                t.Name.Equals(saveKey, StringComparison.OrdinalIgnoreCase));
+
+            string portsText = analyzed.OpenPorts.Count > 0
+                ? string.Join(", ", analyzed.OpenPorts)
+                : "443";
+            DomainAnalyzeStatus =
+                $"Готово: {plan.Label} — {finalDomains.Count} доменов, {verify.ResolvedIps.Count} IP, порты: {portsText}";
+            AppendLog($"Домен «{normalized}» ({plan.Label}): {finalDomains.Count} доменов, {verify.ResolvedIps.Count} IP, порты {portsText}. {verify.Message}");
+
+            if (!string.IsNullOrEmpty(plan.ServiceKey) &&
+                (SelectedPreset is null || !SelectedPreset.IncludesService(plan.ServiceKey)))
+            {
+                var better = Presets.FirstOrDefault(p => p.IsRecommended)
+                             ?? Presets.FirstOrDefault();
+                if (better is not null) SelectedPreset = better;
+            }
+
+            if (!IsRunning && CanStart)
+            {
+                AppendLog("Автозапуск обхода DPI для нового домена…");
+                await StartAsync().ConfigureAwait(true);
+            }
+            else if (IsRunning)
+            {
+                AppendLog("Перезапуск движка с новым списком…");
+                await ApplyStrategyAsync().ConfigureAwait(true);
+            }
+            else
+            {
+                AppendLog("Домен сохранён. Запустите обход вручную, когда движок будет готов.");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            DomainAnalyzeStatus = "Таймаут — домен сохранён по спискам. Запустите обход.";
+            AppendLog("Проверка домена: таймаут (данные сохранены).");
+        }
+        catch (Exception ex)
+        {
+            DomainAnalyzeStatus = $"Ошибка: {ex.Message}";
+            AppendLog($"Ошибка настройки домена: {ex.Message}");
+        }
+        finally
+        {
+            IsAnalyzingDomain = false;
+        }
+    }
+
+    private void DeleteCustomTarget()
+    {
+        if (SelectedCustomTarget is not { } target) return;
+        if (!ConfirmDialog.Show("Удалить домен?",
+                $"Список «{target.Name}» ({target.DomainCount} доменов) будет удалён из обхода."))
+            return;
+
+        _targets.Delete(target.Name);
+        ReloadCustomTargets();
+        DomainAnalyzeStatus = $"Удалено: {target.Name}";
+        AppendLog($"Домен удалён из обхода: {target.Name}");
+
+        if (IsRunning)
+            _ = ApplyStrategyAsync();
+    }
+
+    // ---- custom IP rules ---------------------------------------------------
+
+    private string _ipInput = "";
+    public string IpInput
+    {
+        get => _ipInput;
+        set
+        {
+            if (SetField(ref _ipInput, value))
+                AcceptIpCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private string _ipProbeStatus = "IP исключение — игры и серверы без DPI. Проверка ping/TCP перед принятием.";
+    public string IpProbeStatus
+    {
+        get => _ipProbeStatus;
+        private set => SetField(ref _ipProbeStatus, value);
+    }
+
+    private bool _isProbingIp;
+    public bool IsProbingIp
+    {
+        get => _isProbingIp;
+        private set
+        {
+            if (SetField(ref _isProbingIp, value))
+            {
+                AcceptIpCommand.RaiseCanExecuteChanged();
+                DeleteIpCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    private CustomIpRule? _selectedIpRule;
+    public CustomIpRule? SelectedIpRule
+    {
+        get => _selectedIpRule;
+        set
+        {
+            if (SetField(ref _selectedIpRule, value))
+                DeleteIpCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public bool HasCustomIpRules => CustomIpRules.Count > 0;
+
+    private void ReloadCustomIpRules()
+    {
+        CustomIpRules.Clear();
+        foreach (var r in _ipRules.GetRules())
+            CustomIpRules.Add(r);
+        OnPropertyChanged(nameof(HasCustomIpRules));
+        SelectedIpRule ??= CustomIpRules.FirstOrDefault();
+    }
+
+    private async Task AcceptIpAsync()
+    {
+        string cidr = IpRuleService.NormalizeCidr(IpInput);
+        if (cidr.Length == 0)
+        {
+            IpProbeStatus = "Некорректный IP. Пример: 1.2.3.4 или 10.0.0.0/24";
+            return;
+        }
+
+        IsProbingIp = true;
+        IpProbeStatus = $"Сохранение {cidr}…";
+        try
+        {
+            _ipRules.SaveRule(cidr, IpRuleKind.Exclude, 0, "user");
+            ReloadCustomIpRules();
+            IpInput = "";
+            IpProbeStatus = $"Принято: {cidr}. Проверка TCP…";
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            var probe = await Task.Run(() => IpRuleService.ProbeStabilityAsync(cidr, cts.Token))
+                .ConfigureAwait(false);
+
+            if (probe.AvgPingMs > 0)
+            {
+                _ipRules.SaveRule(cidr, IpRuleKind.Exclude, probe.AvgPingMs, "user");
+                ReloadCustomIpRules();
+            }
+
+            OnUi(() => IpProbeStatus = $"{cidr}: {probe.Message}");
+
+            AppendLog($"IP исключение {cidr}: {probe.Message}");
+
+            if (IsRunning)
+            {
+                AppendLog("Перезапуск движка с IP-исключением…");
+                _ = Task.Run(async () =>
+                {
+                    try { await ApplyStrategyAsync().ConfigureAwait(false); }
+                    catch (Exception ex) { OnUi(() => AppendLog($"Перезапуск: {ex.Message}")); }
+                });
+            }
+            else
+            {
+                AppendLog("IP сохранён. Включите обход на главной вкладке.");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            IpProbeStatus = "Проверка TCP прервана — IP уже сохранён.";
+        }
+        catch (Exception ex)
+        {
+            IpProbeStatus = $"Ошибка: {ex.Message}";
+            AppendLog($"Ошибка IP: {ex.Message}");
+        }
+        finally
+        {
+            IsProbingIp = false;
+        }
+    }
+
+    private void DeleteIpRule()
+    {
+        if (SelectedIpRule is not { } rule) return;
+        if (!ConfirmDialog.Show("Удалить IP?",
+                $"Правило «{rule.Cidr}» будет удалено из TCP/UDP фильтра."))
+            return;
+
+        _ipRules.Delete(rule.Cidr);
+        ReloadCustomIpRules();
+        IpProbeStatus = $"Удалено: {rule.Cidr}";
+        AppendLog($"IP удалён: {rule.Cidr}");
+
+        if (IsRunning)
+            _ = ApplyStrategyAsync();
+    }
+
+    // ---- voice assistant ---------------------------------------------------
+
+    private string _voiceInput = "";
+    public string VoiceInput
+    {
+        get => _voiceInput;
+        set
+        {
+            if (SetField(ref _voiceInput, value))
+                SendVoiceCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private string _voiceStatus = "Нажмите микрофон или напишите запрос. Нужен запущенный OpenCode: opencode serve --port 4096";
+    public string VoiceStatus
+    {
+        get => _voiceStatus;
+        private set => SetField(ref _voiceStatus, value);
+    }
+
+    private string _openCodeAgentsText = "";
+    public string SpeechCapabilityText
+    {
+        get => _speechCapabilityText;
+        private set => SetField(ref _speechCapabilityText, value);
+    }
+    private string _speechCapabilityText = "";
+
+    public ObservableCollection<VoiceTtsOption> VoiceTtsLanguages { get; } = [];
+
+    public string VoiceTtsLanguage
+    {
+        get => Settings.VoiceTtsLanguage;
+        set
+        {
+            string code = string.IsNullOrWhiteSpace(value) ? "ru-RU" : value.Trim();
+            if (Settings.VoiceTtsLanguage.Equals(code, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            Settings.VoiceTtsLanguage = code;
+            _settingsSvc.Save();
+            _voice.ConfigureFromSettings(Settings);
+            OnPropertyChanged();
+            SpeechCapabilityText = _voice.SpeechCapability;
+            UpdateVoiceAssistantCardStatus();
+        }
+    }
+
+    public string VoiceAssistantCardStatus
+    {
+        get => _voiceAssistantCardStatus;
+        private set => SetField(ref _voiceAssistantCardStatus, value);
+    }
+    private string _voiceAssistantCardStatus = "Подключение…";
+
+    public string OpenCodeAgentsText
+    {
+        get => _openCodeAgentsText;
+        private set => SetField(ref _openCodeAgentsText, value);
+    }
+
+    private bool _isListening;
+    public bool IsListening
+    {
+        get => _isListening;
+        private set
+        {
+            if (SetField(ref _isListening, value))
+                ToggleMicCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private bool _isVoiceBusy;
+    public bool IsVoiceBusy
+    {
+        get => _isVoiceBusy;
+        private set
+        {
+            if (SetField(ref _isVoiceBusy, value))
+                RaiseVoiceCommandStates();
+        }
+    }
+
+    private void SeedVoiceWelcome()
+    {
+        SpeechCapabilityText = _voice.SpeechCapability;
+        UpdateVoiceAssistantCardStatus();
+        if (VoiceMessages.Count > 0) return;
+        VoiceMessages.Add(new VoiceChatMessage
+        {
+            Role = VoiceMessageRole.Assistant,
+            Text = BuildWelcomeText(),
+            AgentName = "zapret"
+        });
+    }
+
+    private string BuildWelcomeText() =>
+        _voice.CanListen
+            ? "Привет! Нажмите микрофон и говорите — я отвечу в чате и озвучу."
+            : "Привет! Пока пишите текстом — микрофон подключается автоматически.";
+
+    private async Task OnVoiceTabOpenedAsync()
+    {
+        _voice.ConfigureFromSettings(Settings);
+        OnUi(() =>
+        {
+            SpeechCapabilityText = _voice.SpeechCapability;
+            UpdateVoiceAssistantCardStatus();
+        });
+
+        if (_voiceWelcomeSpoken) return;
+        _voiceWelcomeSpoken = true;
+
+        string welcome = BuildWelcomeText();
+        if (VoiceBackendDefaults.SpeakResponses)
+            await SpeakVoiceAsync(welcome).ConfigureAwait(false);
+    }
+
+    private async Task ConnectVoiceBackendSilentAsync()
+    {
+        try
+        {
+            var (ok, msg) = await _voice.RefreshConnectionAsync(Settings).ConfigureAwait(false);
+            if (!ok)
+            {
+                var (running, runMsg) = await OpenCodeLauncher.GetServerStatusAsync(
+                    VoiceBackendDefaults.ResolveOpenCodeUrl(Settings)).ConfigureAwait(false);
+                if (running)
+                    (ok, msg) = await _voice.RefreshConnectionAsync(Settings).ConfigureAwait(false);
+                else
+                {
+                    bool started = await OpenCodeLauncher.TryEnsureRunningAsync(
+                        VoiceBackendDefaults.ResolveOpenCodeUrl(Settings)).ConfigureAwait(false);
+                    if (started)
+                        (ok, msg) = await _voice.RefreshConnectionAsync(Settings).ConfigureAwait(false);
+                }
+            }
+
+            OnUi(() =>
+            {
+                UpdateOpenCodeAgentsText();
+                UpdateVoiceAssistantCardStatus();
+                if (ok)
+                    VoiceStatus = "Готов. OpenCode подключён. Нажмите микрофон или напишите запрос.";
+                else
+                    VoiceStatus = msg.Contains("недоступен", StringComparison.OrdinalIgnoreCase)
+                        ? "OpenCode уже может быть запущен — попробуйте задать вопрос. Если не отвечает, нажмите «Запустить OpenCode в терминале»."
+                        : msg;
+            });
+        }
+        catch
+        {
+            OnUi(() => VoiceStatus = "Голосовой помощник готов. Пишите или говорите.");
+        }
+    }
+
+    private async Task SendVoiceAsync()
+    {
+        string text = VoiceInput.Trim();
+        if (text.Length == 0) return;
+        VoiceInput = "";
+        await ProcessVoiceRequestAsync(text).ConfigureAwait(false);
+    }
+
+    private async Task ToggleMicAsync()
+    {
+        if (IsListening)
+        {
+            _voice.StopListening();
+            _listenCts?.Cancel();
+            return;
+        }
+
+        if (!_voice.CanListen)
+        {
+            string hint = _voice.RecognitionHint
+                ?? "Установите русский язык: Параметры → Время и язык → Речь → Распознавание речи.";
+            VoiceStatus = hint;
+            await PostSystemAsync(hint).ConfigureAwait(false);
+            return;
+        }
+
+        IsListening = true;
+        VoiceStatus = "Слушаю… говорите (нажмите микрофон ещё раз, чтобы остановить)";
+        _listenCts = new CancellationTokenSource();
+        try
+        {
+            string? heard = await _voice.ListenAsync(_listenCts.Token, partial =>
+                OnUi(() => { if (IsListening) VoiceInput = partial; }))
+                .ConfigureAwait(false);
+
+            if (_listenCts.IsCancellationRequested)
+            {
+                OnUi(() => VoiceStatus = "Запись остановлена.");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(heard))
+            {
+                const string msg = "Не расслышал. Попробуйте ещё раз или напишите текстом.";
+                OnUi(() => VoiceStatus = msg);
+                await SpeakVoiceAsync(msg).ConfigureAwait(false);
+                return;
+            }
+
+            OnUi(() => VoiceInput = heard);
+            await ProcessVoiceRequestAsync(heard).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            OnUi(() => VoiceStatus = "Запись остановлена.");
+        }
+        catch (Exception ex)
+        {
+            string err = $"Микрофон: {ex.Message}";
+            OnUi(() => VoiceStatus = err);
+            await PostSystemAsync(err).ConfigureAwait(false);
+        }
+        finally
+        {
+            OnUi(() => IsListening = false);
+            _listenCts?.Dispose();
+            _listenCts = null;
+        }
+    }
+
+    private async Task ProcessVoiceRequestAsync(string userText)
+    {
+        IsVoiceBusy = true;
+        OnUi(() =>
+        {
+            VoiceMessages.Add(new VoiceChatMessage { Role = VoiceMessageRole.User, Text = userText });
+            VoiceStatus = "Думаю…";
+        });
+
+        try
+        {
+            var (ok, connMsg) = await _voice.RefreshConnectionAsync(Settings).ConfigureAwait(false);
+            if (!ok)
+            {
+                OnUi(() => VoiceStatus = "Запускаю OpenCode…");
+                bool started = await OpenCodeLauncher.TryEnsureRunningAsync(
+                    VoiceBackendDefaults.ResolveOpenCodeUrl(Settings)).ConfigureAwait(false);
+                if (started)
+                    (ok, connMsg) = await _voice.RefreshConnectionAsync(Settings).ConfigureAwait(false);
+            }
+
+            if (!ok)
+            {
+                string offline = GetOfflineReply(userText);
+                OnUi(() =>
+                {
+                    VoiceStatus = "OpenCode не запущен — отвечаю локально";
+                    VoiceMessages.Add(new VoiceChatMessage
+                    {
+                        Role = VoiceMessageRole.Assistant,
+                        Text = offline,
+                        AgentName = "local"
+                    });
+                });
+                await SpeakVoiceAsync(offline).ConfigureAwait(false);
+                return;
+            }
+
+            OnUi(UpdateOpenCodeAgentsText);
+
+            var (reply, agent) = await _voice.AskAsync(Settings, userText, CancellationToken.None)
+                .ConfigureAwait(false);
+
+            OnUi(() =>
+            {
+                VoiceMessages.Add(new VoiceChatMessage
+                {
+                    Role = VoiceMessageRole.Assistant,
+                    Text = reply,
+                    AgentName = agent
+                });
+                VoiceStatus = agent is not null ? $"Ответ от агента «{agent}»" : "Готово";
+            });
+
+            if (VoiceBackendDefaults.SpeakResponses)
+                await SpeakVoiceAsync(reply).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            string err = $"Произошла ошибка: {ex.Message}";
+            OnUi(() => VoiceStatus = err);
+            await PostSystemAsync(err).ConfigureAwait(false);
+        }
+        finally
+        {
+            OnUi(() => IsVoiceBusy = false);
+        }
+    }
+
+    private static string GetOfflineReply(string userText)
+    {
+        string lower = userText.ToLowerInvariant();
+        if (lower.Contains("привет") || lower.Contains("здравств"))
+            return "Привет! Сейчас сервер OpenCode не запущен. Запустите его, и я смогу полноценно отвечать на вопросы про обход DPI, VPN и настройки.";
+        if (lower.Contains("обход") || lower.Contains("dpi") || lower.Contains("zapret"))
+            return "Для обхода DPI откройте вкладку Главная и нажмите Включить обход. Для умных подсказок запустите сервер OpenCode.";
+        if (lower.Contains("vpn"))
+            return "VPN настраивается на вкладке VPN. Скачайте xray и выберите сервер. Для умных ответов запустите OpenCode.";
+        return "Я вас услышал, но сервер OpenCode сейчас недоступен. Запустите OpenCode и повторите вопрос.";
+    }
+
+    private async Task PostSystemAsync(string text)
+    {
+        OnUi(() => AddVoiceSystem(text));
+        await SpeakVoiceAsync(text).ConfigureAwait(false);
+    }
+
+    private async Task SpeakVoiceAsync(string text)
+    {
+        if (!VoiceBackendDefaults.SpeakResponses || string.IsNullOrWhiteSpace(text))
+            return;
+        string spoken = VoiceResponseSanitizer.ForSpeech(text, Settings.VoiceTtsLanguage);
+        if (spoken.Length == 0) return;
+        await _voice.SpeakAsync(SimplifyForSpeech(spoken), CancellationToken.None).ConfigureAwait(false);
+    }
+
+    private static string SimplifyForSpeech(string text)
+    {
+        string s = text.Trim();
+        s = s.Replace("127.0.0.1:4096", "локальный сервер", StringComparison.OrdinalIgnoreCase);
+        s = s.Replace("opencode serve --port 4096", "запустите сервер OpenCode", StringComparison.OrdinalIgnoreCase);
+        s = s.Replace("OpenCode недоступен:", "OpenCode недоступен.", StringComparison.OrdinalIgnoreCase);
+        s = s.Replace("Подключение не установлено, т.к. конечный компьютер отверг запрос на подключение.",
+            "Сервер не запущен. Запустите OpenCode.", StringComparison.OrdinalIgnoreCase);
+        s = s.Replace("т.к.", "так как", StringComparison.OrdinalIgnoreCase);
+        s = s.Replace("HTTP ", "ошибка ", StringComparison.OrdinalIgnoreCase);
+        return s;
+    }
+
+    private void ClearVoiceChat()
+    {
+        _voice.StopSpeaking();
+        _voice.ResetSession();
+        VoiceMessages.Clear();
+        _voiceWelcomeSpoken = false;
+        SeedVoiceWelcome();
+        VoiceStatus = "Диалог очищен. Скажите или напишите новый запрос.";
+        ClearVoiceCommand.RaiseCanExecuteChanged();
+    }
+
+    private void AddVoiceSystem(string text) =>
+        VoiceMessages.Add(new VoiceChatMessage { Role = VoiceMessageRole.System, Text = text });
+
+    private void UpdateOpenCodeAgentsText()
+    {
+        SpeechCapabilityText = _voice.SpeechCapability;
+        string agents = FormatAgents();
+        OpenCodeAgentsText = agents.Length > 0
+            ? $"Агенты: {agents} · авто-подбор и озвучка всегда включены"
+            : "Авто-подбор агента и озвучка всегда включены";
+    }
+
+    private void UpdateVoiceAssistantCardStatus()
+    {
+        string mic = _voice.CanListen
+            ? $"Микрофон: {_voice.RecognitionLanguage}"
+            : "Микрофон: подключается автоматически";
+        string agents = FormatAgents();
+        string agentLine = agents.Length > 0 ? $"Агенты: {agents}" : "Агенты: авто-подбор";
+        string tts = _voice.TtsLanguageLabel.Length > 0 ? _voice.TtsLanguageLabel : "Русский";
+        VoiceAssistantCardStatus = $"{mic} · {agentLine} · озвучка: {tts}";
+    }
+
+    private void ReloadVoiceTtsOptions()
+    {
+        VoiceTtsLanguages.Clear();
+        foreach (var opt in VoiceAssistantService.GetTtsOptions())
+            VoiceTtsLanguages.Add(opt);
+
+        if (VoiceTtsLanguages.All(o => !o.Code.Equals(Settings.VoiceTtsLanguage, StringComparison.OrdinalIgnoreCase)))
+            Settings.VoiceTtsLanguage = "ru-RU";
+    }
+
+    private async Task LaunchOpenCodeInTerminalAsync()
+    {
+        string url = VoiceBackendDefaults.ResolveOpenCodeUrl(Settings);
+        VoiceStatus = "Проверяю OpenCode…";
+
+        var progress = new Progress<string>(msg => OnUi(() => VoiceStatus = msg));
+        var (ok, msg) = await OpenCodeLauncher.LaunchInTerminalAsync(url, progress).ConfigureAwait(false);
+
+        OnUi(() =>
+        {
+            if (ok)
+            {
+                VoiceStatus = msg.Contains("уже работает", StringComparison.OrdinalIgnoreCase)
+                    ? msg
+                    : "OpenCode запущен. Не закрывайте окно cmd, если оно открылось.";
+                Notify?.Invoke("OpenCode", msg);
+            }
+            else
+            {
+                VoiceStatus = msg;
+                Notify?.Invoke("OpenCode", msg);
+            }
+        });
+    }
+
+    private string FormatAgents() =>
+        _voice.KnownAgents.Count > 0
+            ? string.Join(", ", _voice.KnownAgents.Take(6))
+            : "build, plan";
+
+    private void RaiseVoiceCommandStates()
+    {
+        SendVoiceCommand.RaiseCanExecuteChanged();
+        ToggleMicCommand.RaiseCanExecuteChanged();
+        ClearVoiceCommand.RaiseCanExecuteChanged();
+    }
 
     // ---- lifecycle ---------------------------------------------------------
 
@@ -524,6 +1294,8 @@ public sealed class MainViewModel : ObservableObject
 
         ReloadPresets();
         _hostlists.SeedDefaults();
+        ReloadCustomTargets();
+        ReloadCustomIpRules();
         _engine.GameFilter = Settings.GameFilter;
         _engine.BypassAllSites = Settings.BypassAllSites;
 
@@ -553,28 +1325,31 @@ public sealed class MainViewModel : ObservableObject
 
         if (Settings.AutostartEngine && CanStart && SelectedPreset is not null)
             await StartAsync();
+
+        _ = ConnectVoiceBackendSilentAsync();
     }
 
     private void ShowChangelogIfUpdated()
     {
         string currentVersion = UpdaterService.AppVersion;
+        string currentKey = $"{currentVersion}+{UpdaterService.AppBuild}";
         string lastSeen = Settings.LastSeenVersion ?? "";
 
-        if (string.Equals(currentVersion, lastSeen, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(currentKey, lastSeen, StringComparison.OrdinalIgnoreCase))
             return;
 
         // First launch ever — just mark as seen, don't show
         if (string.IsNullOrEmpty(lastSeen))
         {
-            Settings.LastSeenVersion = currentVersion;
+            Settings.LastSeenVersion = currentKey;
             _settingsSvc.Save();
             return;
         }
 
-        // Version changed — show changelog
+        // Version/build changed — show changelog
         string changelog = GetEmbeddedChangelog();
 
-        Settings.LastSeenVersion = currentVersion;
+        Settings.LastSeenVersion = currentKey;
         _settingsSvc.Save();
 
         System.Windows.Application.Current.Dispatcher.BeginInvoke(() =>
@@ -586,14 +1361,14 @@ public sealed class MainViewModel : ObservableObject
 
     private static string GetEmbeddedChangelog()
     {
-        return @"✦ Обновление с любой версии (2.7.x+)
-Полная замена файлов, удаление старых DLL/exe, лог в logs\update.log.
+        return @"✦ Новая иконка приложения
+Щит с буквой Z на тёмном фоне — в exe, окне и трее.
 
-✦ FTP + GitHub
-Версии в настройках. Установка с FTP или GitHub.
+✦ Скачать вручную
+https://github.com/kayucm21/Zanpet/releases/latest
 
-✦ Telegram / Discord
-Мост Telegram автозапуск. Discord и Telegram.exe — вручную.";
+✦ Обновление
+Настройки → Проверить обновления (FTP + GitHub).";
     }
 
     private void AutoImportClassicPresets(bool force = false)
@@ -741,6 +1516,10 @@ public sealed class MainViewModel : ObservableObject
                         _ => "GitHub",
                     };
                     AppUpdateAvailable = $"v{appInfo.Tag} ({sourceLabel})";
+                    string ghLink = "https://github.com/kayucm21/Zanpet/releases/latest";
+                    string notes = string.IsNullOrWhiteSpace(appInfo.Notes)
+                        ? "Новая иконка и исправления."
+                        : appInfo.Notes.Trim();
                     string appMsg = $"Доступно обновление: v{appInfo.Tag} ({sourceLabel}) | FTP: {snap.FtpDisplay} | GitHub: {snap.GitHubDisplay}";
                     UpdateStatus = appMsg;
                     AppendLog(appMsg);
@@ -753,7 +1532,7 @@ public sealed class MainViewModel : ObservableObject
                     else
                     {
                         var result = MessageBox.Show(
-                            $"Установлено: v{snap.CurrentVersion}\nFTP: {snap.FtpDisplay}\nGitHub: {snap.GitHubDisplay}\n\nДоступно: v{appInfo.Tag} ({sourceLabel})\n\nСкачать и установить?",
+                            $"Установлено: v{snap.CurrentVersion} (сборка {snap.InstalledBuild})\nFTP: {snap.FtpDisplay}\nGitHub: {snap.GitHubDisplay}\n\nДоступно: v{appInfo.Tag} (сборка {appInfo.Build})\n\n{notes}\n\nСкачать с GitHub:\n{ghLink}\n\nСкачать и установить сейчас?",
                             "Обновление приложения",
                             MessageBoxButton.YesNo, MessageBoxImage.Information);
                         if (result == MessageBoxResult.Yes) doInstall = true;
@@ -966,6 +1745,8 @@ public sealed class MainViewModel : ObservableObject
 
     public void Shutdown()
     {
+        try { _listenCts?.Cancel(); } catch { }
+        try { _voice.Dispose(); } catch { }
         try { _discordHosts.Remove(); } catch { }
         try { _socialHosts.RemoveAll(); } catch { }
         try { _telegramHosts.Remove(); } catch { }
@@ -1000,6 +1781,9 @@ public sealed class MainViewModel : ObservableObject
         HomeToggleCommand.RaiseCanExecuteChanged();
         VpnDownloadXrayCommand.RaiseCanExecuteChanged();
         VpnConnectCommand.RaiseCanExecuteChanged();
+        SendVoiceCommand.RaiseCanExecuteChanged();
+        ToggleMicCommand.RaiseCanExecuteChanged();
+        ClearVoiceCommand.RaiseCanExecuteChanged();
     }
 
     // ---- VPN actions -------------------------------------------------------
