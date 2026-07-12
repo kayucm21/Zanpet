@@ -1,0 +1,76 @@
+name: desktop-release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v2.9.13)'
+        required: true
+        default: 'v2.9.13'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Read version
+        id: ver
+        shell: pwsh
+        run: |
+          $csproj = Get-Content ZapretUI.csproj -Raw
+          if ($csproj -match '<Version>(\d+\.\d+\.\d+)</Version>') {
+            $v = $Matches[1]
+          } else { throw 'Version not found in csproj' }
+          if ($csproj -match '<InformationalVersion>([^<]+)</InformationalVersion>') {
+            $info = $Matches[1].Trim()
+          } else { $info = $v }
+          if ($info -match '\+(\d+)$') { $build = $Matches[1] } else { $build = '0' }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "info=$info" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "build=$build" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: dotnet publish
+        run: >
+          dotnet publish ZapretUI.csproj -c Release
+          -p:Version=${{ steps.ver.outputs.version }}
+          -p:AssemblyVersion=${{ steps.ver.outputs.version }}.0
+          -p:FileVersion=${{ steps.ver.outputs.version }}.0
+          -p:InformationalVersion=${{ steps.ver.outputs.info }}
+
+      - name: Build ZIP
+        shell: pwsh
+        run: ./Scripts/Build-ReleaseZip.ps1 -Version ${{ steps.ver.outputs.version }} -SkipPublish
+
+      - name: Upload GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          name: ZapretUI ${{ steps.ver.outputs.version }}
+          body: |
+            [build:${{ steps.ver.outputs.build }}]
+
+            ## ZapretUI v${{ steps.ver.outputs.version }}
+
+            - Автозапуск обхода при старте (winws2, TgWsProxy)
+            - TgWsProxy встроен в ZIP
+            - Bootstrap движка из ClassicData
+            - Firefox: gstatic/googleapis CDN + Mozilla hostlist
+            - OpenCode: fallback через FTP
+
+            **Скачать:** ZapretUI-v${{ steps.ver.outputs.version }}.zip
+          files: |
+            bin/Release/net9.0-windows10.0.19041.0/win-x64/publish/ZapretUI-v${{ steps.ver.outputs.version }}.zip
+          fail_on_unmatched_files: true
