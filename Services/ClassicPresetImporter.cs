@@ -175,6 +175,9 @@ public sealed class ClassicPresetImporter
 
     public static void CopyClassicData(string sourceDir)
     {
+        if (!Directory.Exists(sourceDir))
+            return;
+
         string listsDir = AppPaths.ListsDir;
         string engineDir = AppPaths.EngineDir;
         string filesFakeDir = Path.Combine(engineDir, "files", "fake");
@@ -237,6 +240,14 @@ public sealed class ClassicPresetImporter
                     File.Copy(src, dest, overwrite: true);
             }
 
+            string bundledTgWs = Path.Combine(srcExe, "TgWsProxy.exe");
+            if (File.Exists(bundledTgWs))
+            {
+                string tgwsDir = Path.Combine(engineDir, "tgws");
+                Directory.CreateDirectory(tgwsDir);
+                File.Copy(bundledTgWs, Path.Combine(tgwsDir, "TgWsProxy.exe"), overwrite: true);
+            }
+
             string srcVersion = Path.Combine(sourceDir, "installed_version.txt");
             if (File.Exists(srcVersion))
             {
@@ -244,6 +255,20 @@ public sealed class ClassicPresetImporter
                 File.Copy(srcVersion, destVersion, overwrite: true);
             }
         }
+    }
+
+    /// <summary>
+    /// Copy bundled engine binaries and data from ClassicData into %LOCALAPPDATA%\ZapretUI\engine.
+    /// Safe to call on every startup — overwrites only engine files.
+    /// </summary>
+    public static bool EnsureEngineBootstrapped()
+    {
+        string classicDir = AppPaths.ClassicDataDir;
+        if (!Directory.Exists(classicDir))
+            return File.Exists(AppPaths.WinwsExe);
+
+        CopyClassicData(classicDir);
+        return File.Exists(AppPaths.WinwsExe);
     }
 
     private static void CopyDirectory(string source, string dest, string pattern)

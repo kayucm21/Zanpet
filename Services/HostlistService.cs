@@ -82,7 +82,7 @@ public sealed class HostlistService
     {
         "youtube", "discord", "discord-shop", "telegram",
         "tiktok", "tiktok-web", "tiktok-upload", "instagram", "facebook", "whatsapp", "whatsapp-web",
-        "exclude", "general",
+        "firefox", "exclude", "general",
     };
 
     /// <summary>Re-sync the bundled lists from code on EVERY launch, so domain updates reach existing
@@ -101,6 +101,7 @@ public sealed class HostlistService
         Write("facebook", string.Join('\n', DefaultFacebook));
         Write("whatsapp", string.Join('\n', DefaultWhatsapp));
         Write("whatsapp-web", string.Join('\n', DefaultWhatsappWeb));
+        Write("firefox", string.Join('\n', DefaultFirefox));
         Write("exclude",  string.Join('\n', DefaultExclude));
         Write("general",  string.Join('\n', DefaultGeneral));
         WriteIpset("telegram", string.Join('\n', DefaultTelegramIpset));
@@ -159,16 +160,27 @@ public sealed class HostlistService
     private static readonly string[] DefaultYoutube =
     [
         "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "youtubekids.com",
-        "googlevideo.com", "manifest.googlevideo.com",
+        "googlevideo.com", "manifest.googlevideo.com", "redirector.googlevideo.com",
         "ggpht.com", "yt3.ggpht.com", "yt4.ggpht.com",
-        "ytimg.com", "ytimg.l.google.com", "gvt1.com",
-        "yt3.googleusercontent.com", "lh3.googleusercontent.com",
+        "ytimg.com", "ytimg.l.google.com", "gvt1.com", "gvt2.com",
+        "yt3.googleusercontent.com", "lh3.googleusercontent.com", "googleusercontent.com",
         "youtube-nocookie.com", "youtube-ui.l.google.com", "wide-youtube.l.google.com",
         "yt-video-upload.l.google.com",
         "youtubeembeddedplayer.googleapis.com", "youtube.googleapis.com",
         "youtubei.googleapis.com", "jnn-pa.googleapis.com",
+        "googleapis.com", "ajax.googleapis.com", "fonts.googleapis.com",
+        "gstatic.com", "www.gstatic.com", "fonts.gstatic.com",
         "play.google.com", "accounts.google.com", "googleadservices.com",
         "google.com", "google.ru",
+    ];
+
+    /// <summary>Mozilla/Firefox — player scripts, addons, connectivity checks (Firefox blocks when DPI resets these).</summary>
+    private static readonly string[] DefaultFirefox =
+    [
+        "firefox.com", "www.firefox.com", "mozilla.org", "www.mozilla.org", "mozilla.net", "mozilla.com",
+        "addons.mozilla.org", "aus5.mozilla.org", "versioncheck-bg.addons.mozilla.org",
+        "detectportal.firefox.com", "push.services.mozilla.com", "normandy.cdn.mozilla.net",
+        "firefox.settings.services.mozilla.com", "content-signature-2.cdn.mozilla.net",
     ];
 
     /// <summary>Full Discord domain set (Flowseal list-general.txt, Discord entries).

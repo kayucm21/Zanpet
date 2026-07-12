@@ -40,10 +40,40 @@ public static class AppPaths
     // Scratch space for downloads
     public static string TempDir => Path.Combine(Root, "tmp");
 
+    /// <summary>Install folder (directory containing ZapretUI.exe).</summary>
+    public static string InstallDirectory
+    {
+        get
+        {
+            string? fromProcess = Path.GetDirectoryName(Environment.ProcessPath);
+            if (!string.IsNullOrWhiteSpace(fromProcess))
+                return Path.GetFullPath(fromProcess).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            return Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+    }
+
     /// <summary>ClassicData folder (bundled presets, bin, lua, lists, windivert) alongside the exe.</summary>
-    public static string ClassicDataDir => Path.Combine(
-        Path.GetDirectoryName(Environment.ProcessPath) ?? AppDomain.CurrentDomain.BaseDirectory,
-        "ClassicData");
+    public static string ClassicDataDir => ResolveClassicDataDir();
+
+    private static string ResolveClassicDataDir()
+    {
+        foreach (string? baseDir in new string?[]
+                 {
+                     Path.GetDirectoryName(Environment.ProcessPath),
+                     InstallDirectory,
+                     AppDomain.CurrentDomain.BaseDirectory,
+                 })
+        {
+            if (string.IsNullOrWhiteSpace(baseDir)) continue;
+            string candidate = Path.Combine(Path.GetFullPath(baseDir), "ClassicData");
+            if (Directory.Exists(candidate))
+                return candidate;
+        }
+
+        return Path.Combine(InstallDirectory, "ClassicData");
+    }
 
     /// <summary>Windows binary subfolder inside the release zip for this OS.</summary>
     public static string ReleaseArchFolder =>

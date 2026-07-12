@@ -1290,6 +1290,12 @@ public sealed class MainViewModel : ObservableObject
 
         // Copy engine binaries + data from ClassicData FIRST so the engine
         // check below finds winws2.exe without needing GitHub on a fresh install.
+        bool engineReady = ClassicPresetImporter.EnsureEngineBootstrapped();
+        if (engineReady)
+            AppendLog("Движок готов (winws2.exe из ClassicData).");
+        else
+            AppendLog($"Движок не найден. Проверьте папку ClassicData рядом с exe: {AppPaths.ClassicDataDir}");
+
         AutoImportClassicPresets(launchedAfterUpdate);
 
         ReloadPresets();
@@ -1303,6 +1309,8 @@ public sealed class MainViewModel : ObservableObject
                          ?? Presets.FirstOrDefault();
 
         EngineVersion = _updater.InstalledVersionDisplay ?? "не установлен";
+        OnPropertyChanged(nameof(CanStart));
+        RaiseCommandStates();
 
         // Skip app update check if recently updated (cooldown 10 min)
         // This prevents the update loop: bat fails → old exe runs → checks again
@@ -1376,11 +1384,18 @@ https://github.com/kayucm21/Zanpet/releases/latest
         try
         {
             string classicDir = AppPaths.ClassicDataDir;
+            if (Directory.Exists(classicDir))
+                ClassicPresetImporter.CopyClassicData(classicDir);
+
             string presetsDir = Path.Combine(classicDir, "presets");
-            if (!Directory.Exists(presetsDir)) return;
+            if (!Directory.Exists(presetsDir))
+            {
+                if (!Directory.Exists(classicDir))
+                    AppendLog($"ClassicData не найдена: {classicDir}");
+                return;
+            }
 
             AppendLog("Авто-импорт классических пресетов…");
-            ClassicPresetImporter.CopyClassicData(classicDir);
             var result = ClassicPresetImporter.ImportFromDirectory(presetsDir);
 
             var existing = _presets.All.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);

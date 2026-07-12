@@ -7,13 +7,13 @@ namespace ZapretUI.Services;
 public sealed class AppSettings
 {
     /// <summary>Schema version for future migrations. Bump when adding/removing fields.</summary>
-    public int SettingsVersion { get; set; } = 16;
+    public int SettingsVersion { get; set; } = 17;
 
     public string? ActivePresetName { get; set; }
     public string? ActiveHostlist { get; set; }
     public bool AutoUpdateEngine { get; set; } = true;
     public bool Autostart { get; set; }
-    public bool AutostartEngine { get; set; }
+    public bool AutostartEngine { get; set; } = true;
     public bool MinimizeToTray { get; set; } = true;
     public bool StartMinimized { get; set; }
 
@@ -196,6 +196,11 @@ public sealed class AppSettings
             if (string.IsNullOrWhiteSpace(VoiceTtsLanguage))
                 VoiceTtsLanguage = "ru-RU";
             SettingsVersion = 16;
+        }
+        if (SettingsVersion < 17)
+        {
+            AutostartEngine = true;
+            SettingsVersion = 17;
         }
         return this;
     }

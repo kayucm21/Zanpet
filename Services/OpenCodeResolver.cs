@@ -17,6 +17,10 @@ public static class OpenCodeResolver
         if (File.Exists(BundledExePath))
             return BundledExePath;
 
+        string classicBundled = Path.Combine(AppPaths.ClassicDataDir, "exe", "opencode.exe");
+        if (File.Exists(classicBundled))
+            return classicBundled;
+
         string? fromPath = FindOnPath("opencode");
         if (fromPath is not null)
             return fromPath;

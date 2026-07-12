@@ -1,0 +1,14 @@
+firefox.com
+www.firefox.com
+mozilla.org
+www.mozilla.org
+mozilla.net
+mozilla.com
+addons.mozilla.org
+aus5.mozilla.org
+versioncheck-bg.addons.mozilla.org
+detectportal.firefox.com
+push.services.mozilla.com
+normandy.cdn.mozilla.net
+firefox.settings.services.mozilla.com
+content-signature-2.cdn.mozilla.net

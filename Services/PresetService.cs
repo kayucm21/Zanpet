@@ -208,10 +208,22 @@ public sealed class PresetService
         "web.whatsapp.com,www.web.whatsapp.com,static.whatsapp.net,mmg.whatsapp.net,g.whatsapp.net,v.whatsapp.net," +
         "dyn.web.whatsapp.com,graph.whatsapp.com,pps.whatsapp.net,edge-chat.facebook.com,star.fallback.c10r.facebook.com";
 
+    /// <summary>YouTube player/static CDN — Firefox loads these before googlevideo (blocked without early desync).</summary>
+    private const string YoutubeCdnDomains =
+        "gstatic.com,www.gstatic.com,googleapis.com,fonts.googleapis.com,fonts.gstatic.com," +
+        "redirector.googlevideo.com,googleusercontent.com,ajax.googleapis.com";
+
+    /// <summary>Mozilla/Firefox browser + addons (separate from YouTube CDN).</summary>
+    private const string FirefoxDomains =
+        "firefox.com,www.firefox.com,mozilla.org,www.mozilla.org,mozilla.net,mozilla.com," +
+        "addons.mozilla.org,aus5.mozilla.org,detectportal.firefox.com,push.services.mozilla.com," +
+        "normandy.cdn.mozilla.net,firefox.settings.services.mozilla.com";
+
     /// <summary>YouTube first — video CDN (googlevideo QUIC) must match before other services.</summary>
     private static void AppendServiceProfiles(List<string> a)
     {
         AppendYoutubeProfiles(a, firstSegment: true);
+        AppendFirefoxProfiles(a, firstSegment: false);
         AppendSocialWebBridgeProfiles(a, firstSegment: false);
         AppendDiscordProfiles(a, firstSegment: false);
         AppendWhatsappProfiles(a, firstSegment: false);
@@ -408,6 +420,27 @@ public sealed class PresetService
             firstSegment = false;
         }
 
+        // gstatic/googleapis — Firefox player JS/CSS (loads before video segments).
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            $"--hostlist-domains={YoutubeCdnDomains}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            $"--hostlist-domains={YoutubeCdnDomains}",
+            "--out-range=-d8",
+            "--lua-desync=send:repeats=1",
+            "--lua-desync=syndata:blob=tls_google",
+            "--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1:seqovl_pattern=tls_google",
+        });
+
         Next();
         a.AddRange(new[]
         {
@@ -456,6 +489,33 @@ public sealed class PresetService
             "--payload=all",
             "--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=8:payload=all",
         });
+    }
+
+    private static void AppendFirefoxProfiles(List<string> a, bool firstSegment)
+    {
+        void Next()
+        {
+            if (!firstSegment) a.Add("--new");
+            firstSegment = false;
+        }
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            $"--hostlist-domains={FirefoxDomains}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{HOSTLIST:firefox}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
     }
 
     private static void AppendDiscordProfiles(List<string> a, bool firstSegment)

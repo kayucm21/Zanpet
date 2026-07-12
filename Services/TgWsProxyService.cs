@@ -52,6 +52,9 @@ public sealed class TgWsProxyService : IDisposable
     {
         if (File.Exists(ExePath)) return;
 
+        if (TryInstallFromBundled())
+            return;
+
         Directory.CreateDirectory(ExeDir);
 
         Exception? last = null;
@@ -75,6 +78,17 @@ public sealed class TgWsProxyService : IDisposable
 
         throw new InvalidOperationException(
             $"Не удалось скачать компонент Telegram Desktop: {last?.Message ?? "неизвестная ошибка"}");
+    }
+
+    private static bool TryInstallFromBundled()
+    {
+        string bundled = Path.Combine(AppPaths.ClassicDataDir, "exe", "TgWsProxy.exe");
+        if (!File.Exists(bundled))
+            return false;
+
+        Directory.CreateDirectory(ExeDir);
+        File.Copy(bundled, ExePath, overwrite: true);
+        return File.Exists(ExePath);
     }
 
     public async Task StartAsync(CancellationToken ct = default)

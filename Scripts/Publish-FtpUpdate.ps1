@@ -21,7 +21,7 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 if ([string]::IsNullOrWhiteSpace($ZipPath)) {
     $buildScript = Join-Path $PSScriptRoot "Build-ReleaseZip.ps1"
     & $buildScript -Version $Version
-    $ZipPath = Join-Path $root "bin\Release\net9.0-windows\win-x64\publish\ZapretUI-v$Version.zip"
+    $ZipPath = Join-Path $root "bin\Release\net9.0-windows10.0.19041.0\win-x64\publish\ZapretUI-v$Version.zip"
     if (-not (Test-Path $ZipPath)) { throw "Zip not found: $ZipPath" }
 }
 
@@ -33,9 +33,9 @@ if ($zipVersion -and $zipVersion -ne $Version) {
 $manifest = @{
     version = $Version
     tag     = "v$Version"
-    build   = 2
+    build   = 4
     file    = $fileName
-    notes   = "v2.9.12: fix YouTube - merged googlevideo ipset, expanded domains, multidisorder profile"
+    notes   = "v2.9.13: autostart bypass, bundled TgWsProxy, Firefox CDN fix (gstatic/googleapis), engine bootstrap"
 } | ConvertTo-Json -Compress
 
 $manifestPath = Join-Path $env:TEMP "update.json"

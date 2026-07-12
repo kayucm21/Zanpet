@@ -12,6 +12,8 @@ public static class OpenCodeInstaller
     private const string ReleasesApi =
         "https://api.github.com/repos/anomalyco/opencode/releases/latest";
 
+    private const string FtpZipName = "opencode-windows-x64.zip";
+
     public static async Task<(bool Ok, string Message, string? ExePath)> EnsureInstalledAsync(
         IProgress<string>? progress = null,
         CancellationToken ct = default)
@@ -20,41 +22,27 @@ public static class OpenCodeInstaller
         if (existing is not null && File.Exists(existing))
             return (true, "OpenCode найден", existing);
 
+        if (TryInstallFromBundled())
+            return (true, "OpenCode установлен из ClassicData", OpenCodeResolver.BundledExePath);
+
         progress?.Report("Скачиваю OpenCode (~70 МБ), подождите…");
 
         try
         {
-            string? zipUrl = await GetWindowsZipUrlAsync(ct).ConfigureAwait(false);
-            if (zipUrl is null)
-                return (false, "Не найден Windows-архив OpenCode на GitHub", null);
-
-            Directory.CreateDirectory(OpenCodeResolver.InstallDir);
             string zipPath = Path.Combine(OpenCodeResolver.InstallDir, "opencode-download.zip");
-            string exePath = OpenCodeResolver.BundledExePath;
+            Directory.CreateDirectory(OpenCodeResolver.InstallDir);
 
-            await DownloadAsync(zipUrl, zipPath, progress, ct).ConfigureAwait(false);
+            bool downloaded = await TryDownloadFromFtpAsync(zipPath, progress, ct).ConfigureAwait(false);
+            if (!downloaded)
+            {
+                string? zipUrl = await GetWindowsZipUrlAsync(ct).ConfigureAwait(false);
+                if (zipUrl is null)
+                    return (false, "Не найден Windows-архив OpenCode (GitHub и FTP недоступны)", null);
 
-            progress?.Report("Распаковка OpenCode…");
-            string tempDir = Path.Combine(OpenCodeResolver.InstallDir, "_extract");
-            if (Directory.Exists(tempDir))
-                Directory.Delete(tempDir, true);
-            Directory.CreateDirectory(tempDir);
+                await DownloadAsync(zipUrl, zipPath, progress, ct).ConfigureAwait(false);
+            }
 
-            ZipFile.ExtractToDirectory(zipPath, tempDir, overwriteFiles: true);
-
-            string? extracted = Directory.GetFiles(tempDir, "opencode.exe", SearchOption.AllDirectories)
-                .FirstOrDefault();
-            if (extracted is null)
-                return (false, "В архиве OpenCode нет opencode.exe", null);
-
-            if (File.Exists(exePath))
-                File.Delete(exePath);
-            File.Move(extracted, exePath);
-
-            try { Directory.Delete(tempDir, true); } catch { }
-            try { File.Delete(zipPath); } catch { }
-
-            return (true, "OpenCode установлен", exePath);
+            return await ExtractAndInstallAsync(zipPath, progress, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -64,6 +52,64 @@ public static class OpenCodeInstaller
         {
             return (false, $"Не удалось установить OpenCode: {ex.Message}", null);
         }
+    }
+
+    private static bool TryInstallFromBundled()
+    {
+        string bundled = Path.Combine(AppPaths.ClassicDataDir, "exe", "opencode.exe");
+        if (!File.Exists(bundled))
+            return false;
+
+        Directory.CreateDirectory(OpenCodeResolver.InstallDir);
+        File.Copy(bundled, OpenCodeResolver.BundledExePath, overwrite: true);
+        return File.Exists(OpenCodeResolver.BundledExePath);
+    }
+
+    private static async Task<bool> TryDownloadFromFtpAsync(
+        string zipPath, IProgress<string>? progress, CancellationToken ct)
+    {
+        var cfg = FtpUpdateSettings.Resolve();
+        if (!cfg.IsConfigured) return false;
+
+        try
+        {
+            progress?.Report("Скачиваю OpenCode с FTP-сервера обновлений…");
+            await FtpUpdateService.DownloadZipAsync(cfg, FtpZipName, zipPath, null, ct)
+                .ConfigureAwait(false);
+            return File.Exists(zipPath) && new FileInfo(zipPath).Length > 1_000_000;
+        }
+        catch
+        {
+            try { if (File.Exists(zipPath)) File.Delete(zipPath); } catch { }
+            return false;
+        }
+    }
+
+    private static async Task<(bool Ok, string Message, string? ExePath)> ExtractAndInstallAsync(
+        string zipPath, IProgress<string>? progress, CancellationToken ct)
+    {
+        progress?.Report("Распаковка OpenCode…");
+        string tempDir = Path.Combine(OpenCodeResolver.InstallDir, "_extract");
+        if (Directory.Exists(tempDir))
+            Directory.Delete(tempDir, true);
+        Directory.CreateDirectory(tempDir);
+
+        ZipFile.ExtractToDirectory(zipPath, tempDir, overwriteFiles: true);
+
+        string? extracted = Directory.GetFiles(tempDir, "opencode.exe", SearchOption.AllDirectories)
+            .FirstOrDefault();
+        if (extracted is null)
+            return (false, "В архиве OpenCode нет opencode.exe", null);
+
+        string exePath = OpenCodeResolver.BundledExePath;
+        if (File.Exists(exePath))
+            File.Delete(exePath);
+        File.Move(extracted, exePath);
+
+        try { Directory.Delete(tempDir, true); } catch { }
+        try { File.Delete(zipPath); } catch { }
+
+        return (true, "OpenCode установлен", exePath);
     }
 
     private static async Task<string?> GetWindowsZipUrlAsync(CancellationToken ct)
