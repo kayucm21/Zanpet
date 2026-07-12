@@ -683,12 +683,12 @@ public sealed class UpdaterService
 
     private static void InstallStaged(string stageDir)
     {
+        EngineFileHelper.KillStaleEngineProcesses();
         foreach (var src in Directory.EnumerateFiles(stageDir, "*", SearchOption.AllDirectories))
         {
             string rel = Path.GetRelativePath(stageDir, src);
             string dst = Path.Combine(AppPaths.EngineDir, rel);
-            Directory.CreateDirectory(Path.GetDirectoryName(dst)!);
-            File.Copy(src, dst, overwrite: true);
+            EngineFileHelper.SafeCopyFile(src, dst);
         }
     }
 

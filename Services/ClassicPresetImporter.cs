@@ -189,15 +189,15 @@ public sealed class ClassicPresetImporter
 
         string srcBin = Path.Combine(sourceDir, "bin");
         if (Directory.Exists(srcBin))
-            CopyDirectory(srcBin, filesFakeDir, "*.bin");
+            EngineFileHelper.SafeCopyDirectory(srcBin, filesFakeDir, "*.bin");
 
         string srcLua = Path.Combine(sourceDir, "lua");
         if (Directory.Exists(srcLua))
-            CopyDirectory(srcLua, luaDir, "*.lua");
+            EngineFileHelper.SafeCopyDirectory(srcLua, luaDir, "*.lua");
 
         string srcWf = Path.Combine(sourceDir, "windivert.filter");
         if (Directory.Exists(srcWf))
-            CopyDirectory(srcWf, wfDir, "*.txt");
+            EngineFileHelper.SafeCopyDirectory(srcWf, wfDir, "*.txt");
 
         string srcLists = Path.Combine(sourceDir, "lists");
         if (Directory.Exists(srcLists))
@@ -205,7 +205,7 @@ public sealed class ClassicPresetImporter
             foreach (var f in Directory.EnumerateFiles(srcLists, "ipset-*.txt"))
             {
                 string dest = Path.Combine(listsDir, Path.GetFileName(f));
-                File.Copy(f, dest, overwrite: true);
+                EngineFileHelper.SafeCopyFile(f, dest);
             }
             foreach (var f in Directory.EnumerateFiles(srcLists, "*.txt"))
             {
@@ -223,12 +223,12 @@ public sealed class ClassicPresetImporter
             foreach (var f in Directory.EnumerateFiles(srcExe, "*.dll"))
             {
                 string dest = Path.Combine(engineDir, Path.GetFileName(f));
-                File.Copy(f, dest, overwrite: true);
+                EngineFileHelper.SafeCopyFile(f, dest);
             }
             foreach (var f in Directory.EnumerateFiles(srcExe, "*.sys"))
             {
                 string dest = Path.Combine(engineDir, Path.GetFileName(f));
-                File.Copy(f, dest, overwrite: true);
+                EngineFileHelper.SafeCopyFile(f, dest);
             }
             // Copy engine binaries (winws2.exe + cygwin1.dll) so the app works
             // without downloading from GitHub on every fresh install.
@@ -237,7 +237,7 @@ public sealed class ClassicPresetImporter
                 string src = Path.Combine(srcExe, name);
                 string dest = Path.Combine(engineDir, name);
                 if (File.Exists(src))
-                    File.Copy(src, dest, overwrite: true);
+                    EngineFileHelper.SafeCopyFile(src, dest);
             }
 
             string bundledTgWs = Path.Combine(srcExe, "TgWsProxy.exe");
@@ -245,14 +245,14 @@ public sealed class ClassicPresetImporter
             {
                 string tgwsDir = Path.Combine(engineDir, "tgws");
                 Directory.CreateDirectory(tgwsDir);
-                File.Copy(bundledTgWs, Path.Combine(tgwsDir, "TgWsProxy.exe"), overwrite: true);
+                EngineFileHelper.SafeCopyFile(bundledTgWs, Path.Combine(tgwsDir, "TgWsProxy.exe"));
             }
 
             string srcVersion = Path.Combine(sourceDir, "installed_version.txt");
             if (File.Exists(srcVersion))
             {
                 string destVersion = Path.Combine(engineDir, "installed_version.txt");
-                File.Copy(srcVersion, destVersion, overwrite: true);
+                EngineFileHelper.SafeCopyFile(srcVersion, destVersion);
             }
         }
     }
@@ -263,21 +263,25 @@ public sealed class ClassicPresetImporter
     /// </summary>
     public static bool EnsureEngineBootstrapped()
     {
-        string classicDir = AppPaths.ClassicDataDir;
-        if (!Directory.Exists(classicDir))
-            return File.Exists(AppPaths.WinwsExe);
+        try
+        {
+            EngineFileHelper.KillStaleEngineProcesses();
 
-        CopyClassicData(classicDir);
-        return File.Exists(AppPaths.WinwsExe);
+            string classicDir = AppPaths.ClassicDataDir;
+            if (!Directory.Exists(classicDir))
+                return File.Exists(AppPaths.WinwsExe);
+
+            CopyClassicData(classicDir);
+            return File.Exists(AppPaths.WinwsExe);
+        }
+        catch (Exception)
+        {
+            return File.Exists(AppPaths.WinwsExe);
+        }
     }
 
     private static void CopyDirectory(string source, string dest, string pattern)
     {
-        Directory.CreateDirectory(dest);
-        foreach (var f in Directory.EnumerateFiles(source, pattern))
-        {
-            string destFile = Path.Combine(dest, Path.GetFileName(f));
-            File.Copy(f, destFile, overwrite: true);
-        }
+        EngineFileHelper.SafeCopyDirectory(source, dest, pattern);
     }
 }
