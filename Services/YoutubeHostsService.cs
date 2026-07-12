@@ -1,51 +1,16 @@
 using System.Diagnostics;
 using System.IO;
-using System.Text;
 
 namespace ZapretUI.Services;
 
 /// <summary>
-/// Windows hosts pins for YouTube (web + Firefox). ISPs poison Google DNS — Firefox DoH still
-/// fails for youtubei/googlevideo while Telegram hosts fix works the same way.
+/// Removes stale YouTube hosts block from v2.9.16 (pinned google.com/googlevideo — broke CDN for everyone).
+/// YouTube bypass stays on winws hostlists/ipsets only; no hosts pinning.
 /// </summary>
 public sealed class YoutubeHostsService
 {
     private const string BeginMarker = "# BEGIN ZAPRETUI YOUTUBE";
     private const string EndMarker = "# END ZAPRETUI YOUTUBE";
-
-    /// <summary>Google edge IPs — same approach as Discord/Telegram hosts bridge.</summary>
-    private static readonly (string Ip, string[] Domains)[] Entries =
-    [
-        ("142.250.191.78", new[]
-        {
-            "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com",
-            "youtu.be", "youtubekids.com", "youtube-nocookie.com",
-            "youtube-ui.l.google.com", "wide-youtube.l.google.com",
-        }),
-        ("142.250.185.206", new[]
-        {
-            "youtubei.googleapis.com", "youtube.googleapis.com",
-            "youtubeembeddedplayer.googleapis.com", "jnn-pa.googleapis.com",
-            "googleapis.com", "ajax.googleapis.com", "fonts.googleapis.com",
-        }),
-        ("142.250.185.78", new[]
-        {
-            "googlevideo.com", "redirector.googlevideo.com", "manifest.googlevideo.com",
-        }),
-        ("142.250.185.14", new[]
-        {
-            "ytimg.com", "i.ytimg.com", "s.ytimg.com", "ytimg.l.google.com",
-            "ggpht.com", "yt3.ggpht.com", "yt4.ggpht.com",
-        }),
-        ("142.250.191.14", new[]
-        {
-            "gstatic.com", "www.gstatic.com", "ssl.gstatic.com", "fonts.gstatic.com",
-        }),
-        ("142.250.185.110", new[]
-        {
-            "accounts.google.com", "play.google.com", "google.com", "www.google.com",
-        }),
-    ];
 
     private static string HostsPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"drivers\etc\hosts");
@@ -54,60 +19,30 @@ public sealed class YoutubeHostsService
 
     public bool IsApplied { get; private set; }
 
-    public bool Apply()
+    /// <summary>Always strip our block — safe even if a previous session crashed.</summary>
+    public bool StripStaleBlock()
     {
-        if (IsApplied) return true;
         try
         {
-            string text = File.Exists(HostsPath) ? File.ReadAllText(HostsPath) : "";
-            text = StripBlock(text);
-            var block = new StringBuilder();
-            block.AppendLine();
-            block.AppendLine(BeginMarker);
-            int count = 0;
-            foreach (var (ip, domains) in Entries)
-            {
-                foreach (var d in domains)
-                {
-                    block.AppendLine($"{ip} {d}");
-                    count++;
-                }
-            }
-            block.AppendLine(EndMarker);
-            File.WriteAllText(HostsPath, text.TrimEnd() + block.ToString());
+            if (!File.Exists(HostsPath)) return false;
+            string text = File.ReadAllText(HostsPath);
+            if (text.IndexOf(BeginMarker, StringComparison.Ordinal) < 0) return false;
+            File.WriteAllText(HostsPath, StripBlock(text).TrimEnd() + Environment.NewLine);
             FlushDns();
-            IsApplied = true;
-            Emit($"YouTube: hosts ({count} доменов — Firefox/браузер, как Telegram)");
+            IsApplied = false;
+            Emit("YouTube hosts: удалён (v2.9.16 ломал google.com и CDN)");
             return true;
         }
         catch (Exception ex)
         {
-            Emit($"YouTube hosts: {ex.Message} (запустите от администратора)");
+            Emit($"YouTube hosts (очистка): {ex.Message}");
             return false;
         }
     }
 
-    public void Remove()
-    {
-        if (!IsApplied) return;
-        try
-        {
-            if (File.Exists(HostsPath))
-            {
-                string text = StripBlock(File.ReadAllText(HostsPath));
-                File.WriteAllText(HostsPath, text.TrimEnd() + Environment.NewLine);
-            }
-            FlushDns();
-        }
-        catch (Exception ex)
-        {
-            Emit($"YouTube hosts (удаление): {ex.Message}");
-        }
-        finally
-        {
-            IsApplied = false;
-        }
-    }
+    public bool Apply() => false;
+
+    public void Remove() => StripStaleBlock();
 
     private static string StripBlock(string text)
     {

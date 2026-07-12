@@ -35,7 +35,7 @@ $manifest = @{
     tag     = "v$Version"
     build   = 1
     file    = $fileName
-    notes   = "v2.9.16: Firefox YouTube — hosts pin (как Telegram) + TCP ipset googlevideo/youtube"
+    notes   = "v2.9.17: откат YouTube hosts (v2.9.16 ломал google.com/CDN), автоочистка hosts"
 } | ConvertTo-Json -Compress
 
 $manifestPath = Join-Path $env:TEMP "update.json"

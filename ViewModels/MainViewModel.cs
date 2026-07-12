@@ -1308,6 +1308,8 @@ public sealed class MainViewModel : ObservableObject
         _engine.GameFilter = Settings.GameFilter;
         _engine.BypassAllSites = Settings.BypassAllSites;
 
+        _youtubeHosts.StripStaleBlock();
+
         SelectedPreset = Presets.FirstOrDefault(p => p.Name == Settings.ActivePresetName)
                          ?? Presets.FirstOrDefault();
 
@@ -1619,8 +1621,7 @@ https://github.com/kayucm21/Zanpet/releases/latest
                 _discordHosts.Apply();
             if (Settings.TelegramWebHosts && PresetHasService(SelectedPreset, "Telegram"))
                 _telegramHosts.Apply();
-            if (Settings.YoutubeWebHosts && PresetHasService(SelectedPreset, "YouTube"))
-                _youtubeHosts.Apply();
+            _youtubeHosts.StripStaleBlock();
             if (Settings.TikTokWebHosts)
                 _socialHosts.ApplyTikTok();
             if (Settings.InstagramWebHosts)
