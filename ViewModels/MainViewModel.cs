@@ -24,6 +24,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly TgWsProxyService _tgWs = new();
     private readonly TelegramHostsService _telegramHosts = new();
     private readonly DiscordHostsService _discordHosts = new();
+    private readonly YoutubeHostsService _youtubeHosts = new();
     private readonly SocialHostsService _socialHosts = new();
     private readonly DiscordDesktopService _discordDesktop = new();
     private readonly DiscordShopBridgeService _discordShopBridge;
@@ -51,6 +52,7 @@ public sealed class MainViewModel : ObservableObject
                 _discordDesktop.Reset();
                 _telegramHosts.Remove();
                 _discordHosts.Remove();
+                _youtubeHosts.Remove();
                 _socialHosts.RemoveAll();
             }
         });
@@ -58,6 +60,7 @@ public sealed class MainViewModel : ObservableObject
         _tgWs.LogLine += line => OnUi(() => AppendLog(line));
         _telegramHosts.LogLine += line => OnUi(() => AppendLog(line));
         _discordHosts.LogLine += line => OnUi(() => AppendLog(line));
+        _youtubeHosts.LogLine += line => OnUi(() => AppendLog(line));
         _socialHosts.LogLine += line => OnUi(() => AppendLog(line));
         _discordDesktop.LogLine += line => OnUi(() => AppendLog(line));
         _discordShopBridge.LogLine += line => OnUi(() => AppendLog(line));
@@ -1616,6 +1619,8 @@ https://github.com/kayucm21/Zanpet/releases/latest
                 _discordHosts.Apply();
             if (Settings.TelegramWebHosts && PresetHasService(SelectedPreset, "Telegram"))
                 _telegramHosts.Apply();
+            if (Settings.YoutubeWebHosts && PresetHasService(SelectedPreset, "YouTube"))
+                _youtubeHosts.Apply();
             if (Settings.TikTokWebHosts)
                 _socialHosts.ApplyTikTok();
             if (Settings.InstagramWebHosts)
@@ -1763,6 +1768,7 @@ https://github.com/kayucm21/Zanpet/releases/latest
         try { _listenCts?.Cancel(); } catch { }
         try { _voice.Dispose(); } catch { }
         try { _discordHosts.Remove(); } catch { }
+        try { _youtubeHosts.Remove(); } catch { }
         try { _socialHosts.RemoveAll(); } catch { }
         try { _telegramHosts.Remove(); } catch { }
         try { _monitor.Dispose(); } catch { }

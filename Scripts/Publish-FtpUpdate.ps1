@@ -33,9 +33,9 @@ if ($zipVersion -and $zipVersion -ne $Version) {
 $manifest = @{
     version = $Version
     tag     = "v$Version"
-    build   = 6
+    build   = 1
     file    = $fileName
-    notes   = "v2.9.15: strengthen Firefox YouTube - InnerTube API, fake+fakedsplit, QUIC x12"
+    notes   = "v2.9.16: Firefox YouTube — hosts pin (как Telegram) + TCP ipset googlevideo/youtube"
 } | ConvertTo-Json -Compress
 
 $manifestPath = Join-Path $env:TEMP "update.json"

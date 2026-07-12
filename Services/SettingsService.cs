@@ -7,7 +7,7 @@ namespace ZapretUI.Services;
 public sealed class AppSettings
 {
     /// <summary>Schema version for future migrations. Bump when adding/removing fields.</summary>
-    public int SettingsVersion { get; set; } = 17;
+    public int SettingsVersion { get; set; } = 18;
 
     public string? ActivePresetName { get; set; }
     public string? ActiveHostlist { get; set; }
@@ -57,6 +57,9 @@ public sealed class AppSettings
 
     /// <summary>Write Windows hosts for Telegram web + desktop (DC pin, like Discord hosts).</summary>
     public bool TelegramWebHosts { get; set; } = true;
+
+    /// <summary>Write Windows hosts for YouTube web (Google edge pin — fixes Firefox DNS poison).</summary>
+    public bool YoutubeWebHosts { get; set; } = true;
 
     /// <summary>Hosts pin for TikTok CDN (DPI bridge, no app auto-launch).</summary>
     public bool TikTokWebHosts { get; set; } = true;
@@ -201,6 +204,11 @@ public sealed class AppSettings
         {
             AutostartEngine = true;
             SettingsVersion = 17;
+        }
+        if (SettingsVersion < 18)
+        {
+            YoutubeWebHosts = true;
+            SettingsVersion = 18;
         }
         return this;
     }

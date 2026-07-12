@@ -189,7 +189,7 @@ public sealed class PresetService
     [
         "--lua-desync=send:repeats=2",
         "--lua-desync=syndata:blob=tls_google",
-        "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=3",
+        "--lua-desync=hostfakesplit_multi:hosts=google.com,youtube.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=3",
     ];
 
     /// <summary>Flowseal fake+fakedsplit chain for Meta ipsets (WhatsApp desktop/web).</summary>
@@ -527,6 +527,54 @@ public sealed class PresetService
             "--out-range=-d8",
         });
         a.AddRange(YoutubeFlowsealFake);
+
+        // Firefox + hosts pin — TCP to googlevideo/youtube by IP (SNI still googlevideo but dest is ipset).
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{IPSET:googlevideo}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{IPSET:googlevideo}",
+            "--out-range=-d8",
+            "--lua-desync=send:repeats=1",
+            "--lua-desync=syndata:blob=tls_google",
+            "--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1:seqovl_pattern=tls_google",
+        });
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{IPSET:googlevideo}",
+            "--out-range=-d8",
+        });
+        a.AddRange(YoutubeFlowsealFake);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{IPSET:youtube}",
+            "--out-range=-n4",
+        });
+        a.AddRange(FastTls);
+
+        Next();
+        a.AddRange(new[]
+        {
+            "--filter-tcp=80,443",
+            "{IPSET:youtube}",
+            "--out-range=-d10",
+        });
+        a.AddRange(HostFakeSplit);
 
         // Firefox HTTP/3 — QUIC on 443 (primary).
         Next();
@@ -1120,7 +1168,7 @@ public sealed class PresetService
             "--out-range=-n8",
             "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=tls_google",
-            "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2",
+            "--lua-desync=hostfakesplit_multi:hosts=google.com,youtube.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2",
         });
 
         Next();
@@ -1132,7 +1180,7 @@ public sealed class PresetService
             "--out-range=-n8",
             "--lua-desync=send:repeats=2",
             "--lua-desync=syndata:blob=tls_google",
-            "--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=3",
+            "--lua-desync=hostfakesplit_multi:hosts=google.com,youtube.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=3",
         });
     }
 

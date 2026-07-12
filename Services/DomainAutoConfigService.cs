@@ -129,6 +129,7 @@ public sealed class DomainAutoConfigService
                 CrtRoots = [root, "youtube.com", "googlevideo.com"],
                 Ports = [443, 80],
                 DomainCap = 60,
+                Tune = s => s.YoutubeWebHosts = true,
             };
 
         if (Contains(host, "facebook", "fbcdn", "fb.com"))
